@@ -48,9 +48,12 @@ function Room({ code }: { code: string }) {
       pause: () => run("pause", {}),
       ask: (targetId, question) =>
         post<{ reply?: string; delivered?: boolean }>(`${base}/ask`, { playerId, targetId, question }),
-      home: () => router.push("/"),
+      home: () => {
+        clear(); // leaving the room on purpose: no Rejoin button afterwards
+        router.push("/");
+      },
     };
-  }, [code, mine?.playerId, refresh, router]);
+  }, [code, mine?.playerId, refresh, router, clear]);
 
   // Sound: a tick for the last ten seconds of talking, a sting on the reveal.
   useEffect(() => {
@@ -64,6 +67,19 @@ function Room({ code }: { code: string }) {
     }
     if (status === "briefing" || status === "vote") sfx.clue();
   }, [status, code, mine?.playerId]);
+
+  // While this phone is in the room, keep its seat marked as recent.
+  useEffect(() => {
+    if (!mine) return;
+    const touch = () => {
+      try {
+        localStorage.setItem("kaun.session", JSON.stringify({ ...mine, at: Date.now() }));
+      } catch {}
+    };
+    touch();
+    const t = setInterval(touch, 60000);
+    return () => clearInterval(t);
+  }, [mine]);
 
   // Keep the phone awake during a round.
   useEffect(() => {

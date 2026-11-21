@@ -45,11 +45,19 @@ export default function Home() {
     // If this phone was in a game that is still running, offer a way back in.
     try {
       const sess = JSON.parse(localStorage.getItem("kaun.session") || "null");
-      if (sess?.code && sess?.playerId) {
+      // Only offer a way back into a round that is still going and that this
+      // phone was in within the last ten minutes. Anything older is forgotten.
+      const recent = typeof sess?.at === "number" && Date.now() - sess.at < 10 * 60 * 1000;
+      if (sess?.code && sess?.playerId && recent) {
         fetch(`/api/room/${sess.code}?playerId=${sess.playerId}`, { cache: "no-store" })
           .then((r) => (r.ok ? r.json() : null))
-          .then((room) => room?.you && setRejoin(sess.code))
+          .then((room) => {
+            if (room?.you && room.status !== "reveal") setRejoin(sess.code);
+            else localStorage.removeItem("kaun.session");
+          })
           .catch(() => {});
+      } else if (sess) {
+        localStorage.removeItem("kaun.session");
       }
     } catch {}
     fetch("/api/leaderboard", { cache: "no-store" })
@@ -100,7 +108,7 @@ export default function Home() {
       localStorage.setItem("kaun.name", name.trim());
       localStorage.setItem(
         "kaun.session",
-        JSON.stringify({ code: data.code, playerId: data.playerId, name: name.trim() }),
+        JSON.stringify({ code: data.code, playerId: data.playerId, name: name.trim(), at: Date.now() }),
       );
       // A full page load is more dependable than a client-side route change here.
       window.location.assign(`/room/${data.code}`);
@@ -153,9 +161,22 @@ export default function Home() {
 
       <div className="flex shrink-0 flex-col gap-3">
         {rejoin && (
-          <button type="button" className="btn btn-danger tap rise" onClick={() => router.push(`/room/${rejoin}`)}>
-            Rejoin room {rejoin}
-          </button>
+          <div className="rise flex gap-2">
+            <button type="button" className="btn btn-danger tap" onClick={() => router.push(`/room/${rejoin}`)}>
+              Rejoin room {rejoin}
+            </button>
+            <button
+              type="button"
+              aria-label="Dismiss"
+              className="btn btn-glass tap !w-14 shrink-0"
+              onClick={() => {
+                localStorage.removeItem("kaun.session");
+                setRejoin(null);
+              }}
+            >
+              ✕
+            </button>
+          </div>
         )}
         <button
           type="button"

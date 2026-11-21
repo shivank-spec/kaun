@@ -52,7 +52,7 @@ export function useSession() {
   const session = useMemo(() => parse(raw), [raw]);
 
   const save = useCallback((s: Session) => {
-    memory = JSON.stringify(s);
+    memory = JSON.stringify({ ...s, at: Date.now() });
     try {
       window.localStorage.setItem(KEY, memory);
     } catch {}
