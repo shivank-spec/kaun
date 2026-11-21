@@ -10,7 +10,7 @@ Built in one day for the **Play** track at **Vibe Coders Hackathon Edition 3** (
 
 ## Demo video
 
-_Link added at submission._
+[Watch the 60-second demo](https://github.com/shivank-spec/kaun/blob/main/demo/Alibi-demo.mp4)
 
 ## How a round works
 
