@@ -332,9 +332,15 @@ export async function getRoomView(codeRaw: string, playerId: string | null): Pro
       isHost: p.is_host,
       hasVoted: Boolean(p.vote),
       ...(p.is_bot ? { isBot: true } : {}),
+      ...(showCard && f
+        ? (() => {
+            const part = f.suspects.find((x) => x.id === p.id);
+            return part ? { caseRole: part.role, alibi: part.public_alibi } : {};
+          })()
+        : {}),
     })),
     you: me ? { id: me.id, name: me.name, isHost: me.is_host, card: showCard ? me.card : null } : null,
-    case: f && showCard ? { title: f.title, crime: f.crime, intro: f.intro } : null,
+    case: f && showCard ? { title: f.title, crime: f.crime, intro: f.intro, setting: f.setting } : null,
     reveal: room.status === "reveal" ? room.reveal : null,
     hotSeat: hotSeatNow(room, players),
     botClues:

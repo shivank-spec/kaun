@@ -133,9 +133,19 @@ export interface RoomView {
   phaseEndsAt: string | null; // ISO UTC. Countdown = phaseEndsAt - serverNow
   serverNow: string; // ISO UTC, use to correct clock drift
   settings: RoomSettings;
-  players: { id: string; name: string; isHost: boolean; hasVoted: boolean; isBot?: boolean }[];
+  players: {
+    id: string;
+    name: string;
+    isHost: boolean;
+    hasVoted: boolean;
+    isBot?: boolean;
+    /** From briefing onwards: this player's part in the story, e.g. "Consultant". Public. */
+    caseRole?: string;
+    /** From briefing onwards: where they claim they were, e.g. "At the snack bar". Public. */
+    alibi?: string;
+  }[];
   you: { id: string; name: string; isHost: boolean; card: PlayerCard | null } | null;
-  case: { title: string; crime: string; intro: string } | null; // null in lobby
+  case: { title: string; crime: string; intro: string; setting?: string } | null; // null in lobby
   reveal: RoomReveal | null; // only in "reveal"
   /** Mid-discussion twist. Non-null for ~15 s: freeze the screen and show it to everyone. */
   hotSeat?: { playerId: string; playerName: string; question: string; endsAt: string } | null;
