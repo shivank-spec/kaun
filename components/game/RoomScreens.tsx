@@ -277,83 +277,133 @@ export function Lobby({ room, actions }: Props) {
 
 /* ---------------- briefing: hold to reveal your secret role ---------------- */
 
+/** A quoted line the player can read out, with a label above it. */
+function Line({ k, v, color }: { k: string; v: string; color: string }) {
+  return (
+    <div className="rounded-[10px] bg-black/30 px-3 py-2">
+      <p className="label m-0" style={{ color }}>
+        {k}
+      </p>
+      <p className="m-0 mt-0.5 text-[14.5px] leading-snug">{v}</p>
+    </div>
+  );
+}
+
+/** Everything one player needs: who they are, what to say, what they know. */
 function RoleCard({ card, compact = false }: { card: PlayerCard; compact?: boolean }) {
   const culprit = card.role === "culprit";
   const color = culprit ? "#F0385A" : "#5FDDF7";
   const [head, ...rest] = card.mission.split(". ");
   return (
     <div
-      className="rounded-[14px] p-3.5"
+      className="rounded-[16px] p-4"
       style={{
-        background: culprit ? "linear-gradient(180deg, rgba(240,56,90,.24), rgba(40,10,22,.88))" : "linear-gradient(180deg, rgba(95,221,247,.2), rgba(8,22,38,.88))",
+        background: culprit ? "linear-gradient(180deg, rgba(240,56,90,.24), rgba(40,10,22,.9))" : "linear-gradient(180deg, rgba(95,221,247,.2), rgba(8,22,38,.9))",
         boxShadow: `inset 0 0 0 1.5px ${color}, 0 0 26px ${color}33`,
       }}
     >
-      <p className="display m-0 uppercase" style={{ color, fontSize: compact ? 20 : "clamp(26px,8.5vw,34px)" }}>
+      <p className="display m-0 uppercase" style={{ color, fontSize: compact ? 22 : "clamp(26px,8.5vw,34px)" }}>
         {head.replace(/\.$/, "")}
       </p>
-      <p className="m-0 mt-1 text-[14.5px] leading-snug">{rest.join(". ")}</p>
-      <ul className="m-0 mt-3 flex list-none flex-col gap-1.5 p-0">
+      <p className="m-0 mt-1 text-[14.5px] leading-snug">
+        {culprit
+          ? "You did it. Stay calm, tell your cover story, and get them to accuse someone else."
+          : `${rest.join(". ")} Tell people what you saw.`}
+      </p>
+      <div className="mt-3 flex flex-col gap-1.5">
+        {card.job && <Line k="In this case you are" v={card.job} color={color} />}
+        {card.story && <Line k={culprit ? "Your cover story · say this if asked" : "Your story · say this if asked"} v={`“${card.story}”`} color={color} />}
         {card.clues.map((c, i) => (
-          <li key={i} className="rounded-[10px] bg-black/30 px-3 py-2 text-[13.5px] leading-snug">
-            <span className="label mr-2" style={{ color }}>
-              {culprit ? "Deflect" : "You saw"}
-            </span>
-            {c}
-          </li>
+          <Line key={i} k={culprit ? "Use this to blame someone" : "What you saw · tell the room"} v={c} color={color} />
         ))}
-      </ul>
-      {card.objective && (
-        <p className="m-0 mt-2 rounded-[10px] px-3 py-2 text-[13.5px] leading-snug" style={{ boxShadow: "inset 0 0 0 1px rgba(240,56,90,.6)" }}>
-          <span className="label mr-2 text-[#ff8098]">Secret objective</span>
-          {card.objective}
-        </p>
-      )}
+        {card.objective && <Line k="The lie you need them to believe" v={card.objective} color="#ff8098" />}
+      </div>
     </div>
   );
 }
 
-export function Briefing({ room, secondsLeft }: Props) {
-  const [shown, setShown] = useState(false);
+export function Briefing({ room, actions, secondsLeft }: Props) {
+  const [step, setStep] = useState<"case" | "scan" | "role">("case");
   const [hold, setHold] = useState(0);
   const raf = useRef<number | undefined>(undefined);
   const t0 = useRef(0);
   const card = room.you?.card;
+  const facts = room.case?.facts;
 
   const begin = () => {
-    if (shown) return;
     t0.current = performance.now();
-    const step = () => {
+    const tick = () => {
       const p = Math.min(1, (performance.now() - t0.current) / 650);
       setHold(p);
       if (p >= 1) {
-        setShown(true);
+        setStep("role");
         sfx.clue();
-      } else raf.current = requestAnimationFrame(step);
+      } else raf.current = requestAnimationFrame(tick);
     };
-    raf.current = requestAnimationFrame(step);
+    raf.current = requestAnimationFrame(tick);
   };
   const end = () => {
     if (raf.current) cancelAnimationFrame(raf.current);
-    if (!shown) setHold(0);
+    setHold(0);
   };
   useEffect(() => () => { if (raf.current) cancelAnimationFrame(raf.current); }, []);
 
-  return (
-    <main className={`screen ${shown && card?.role === "culprit" ? "alarm" : "cold"}`}>
-      <TopBar />
-      <div className="mt-1 flex items-center justify-between">
-        <span className="eyebrow">{room.case?.title ?? "Case file"}</span>
-        <span className="label text-snow">Discussion in {secondsLeft ?? 0}s</span>
-      </div>
-      <p className="m-0 mt-1.5 text-[14px] leading-snug text-mist">{room.case?.crime}</p>
+  const clock = (
+    <span className="label rounded-full px-2.5 py-1.5 text-snow" style={{ boxShadow: "inset 0 0 0 1px rgba(130,180,230,.4)" }}>
+      Starts in {secondsLeft ?? 0}s
+    </span>
+  );
 
-      {!shown || !card ? (
+  if (step === "case") {
+    return (
+      <main className="screen cold">
+        <TopBar />
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <span className="eyebrow">Step 1 of 2 · The case</span>
+          {clock}
+        </div>
+        <h1 className="display m-0 mt-3 text-[clamp(28px,9vw,36px)]">{room.case?.title}</h1>
+        <div className="panel mt-4 px-4 py-1">
+          <Fact k="What" v={facts?.what ?? room.case?.crime ?? ""} />
+          {facts?.when && <Fact k="When" v={facts.when} />}
+          <Fact k="Where" v={facts?.where ?? (room.case?.setting ?? "").split(/ [–-] |,| \(/)[0]} />
+        </div>
+        <p className="m-0 mt-4 text-[15px] leading-snug text-[#E3E8F2]">{room.case?.intro}</p>
+        <p className="label mt-4 text-snow">The suspects</p>
+        <div className="mt-2 flex flex-1 flex-wrap content-start gap-2">
+          {room.players.map((p, i) => (
+            <span key={p.id} className="panel flex items-center gap-2 px-2.5 py-1.5">
+              <Avatar name={p.name} index={i} size={26} />
+              <span className="text-[13.5px] font-semibold">
+                {label(room, p.name)}
+                {p.id === room.you?.id ? " (you)" : ""}
+              </span>
+              <span className="label !text-[9px]">{p.isBot ? "AI" : ""}</span>
+            </span>
+          ))}
+        </div>
+        <button type="button" className="btn btn-primary tap mt-3" onClick={() => { sfx.tap(); setStep("scan"); }}>
+          Next: see your secret role
+          <Arrow />
+        </button>
+      </main>
+    );
+  }
+
+  return (
+    <main className={`screen ${step === "role" && card?.role === "culprit" ? "alarm" : "cold"}`}>
+      <TopBar />
+      <div className="mt-1 flex items-center justify-between gap-3">
+        <span className="eyebrow">Step 2 of 2 · Your secret role</span>
+        {clock}
+      </div>
+
+      {step === "scan" || !card ? (
         <div className="flex flex-1 flex-col items-center justify-center text-center">
           <h1 className="display m-0 text-[clamp(28px,9vw,36px)]">
-            Tap &amp; Hold
+            Hold to reveal
             <br />
-            to Reveal
+            who you are
           </h1>
           <button
             type="button"
@@ -363,7 +413,7 @@ export function Briefing({ room, secondsLeft }: Props) {
             onPointerLeave={end}
             onPointerCancel={end}
             onContextMenu={(e) => e.preventDefault()}
-            className="relative mt-6 h-[clamp(190px,56vw,250px)] w-[clamp(190px,56vw,250px)] touch-none select-none rounded-full border-0 bg-transparent p-0"
+            className="relative mt-6 h-[clamp(180px,54vw,240px)] w-[clamp(180px,54vw,240px)] touch-none select-none rounded-full border-0 bg-transparent p-0"
             style={{ WebkitTouchCallout: "none" }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -372,16 +422,22 @@ export function Briefing({ room, secondsLeft }: Props) {
               <circle cx="50" cy="50" r="48" fill="none" stroke="#5FDDF7" strokeWidth="2.5" strokeLinecap="round" strokeDasharray={`${hold * 301.6} 301.6`} />
             </svg>
           </button>
-          <p className="m-0 mt-6 text-[15px]">Keep your role private</p>
+          <p className="m-0 mt-6 text-[15px]">Don&apos;t let anyone see your screen</p>
           <p className="label mt-2">Press and hold the scanner</p>
         </div>
       ) : (
-        <div className="rise flex flex-1 flex-col justify-center gap-4 py-4">
-          <RoleCard card={card} />
-          <p className="label text-center">Remember it. You can open this card again during the discussion.</p>
-          <button type="button" className="btn btn-glass tap" onClick={() => { setShown(false); setHold(0); }}>
-            Hide my role
-          </button>
+        <div className="rise mt-3 flex min-h-0 flex-1 flex-col gap-3">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <RoleCard card={card} />
+          </div>
+          {room.you?.isHost ? (
+            <button type="button" className="btn btn-primary tap" onClick={() => void actions.skip().catch(() => {})}>
+              Everyone has read their card? Start
+              <Arrow />
+            </button>
+          ) : (
+            <p className="label mb-1 text-center text-snow">Read it carefully · the discussion starts in {secondsLeft ?? 0}s</p>
+          )}
         </div>
       )}
     </main>
@@ -512,6 +568,12 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
       <div className="mt-1">
         <Timer seconds={secondsLeft ?? 0} total={total} label="Discussion" sub="Talk it out loud" />
       </div>
+      {card?.story && (
+        <div className="panel mt-3 px-3.5 py-2.5">
+          <p className="label m-0 text-cyan">You are the {card.job ?? "suspect"} · if anyone asks, say</p>
+          <p className="m-0 mt-0.5 text-[14.5px] leading-snug">“{card.story}”</p>
+        </div>
+      )}
       <div className="mt-3 flex items-start justify-between gap-3">
         <p className="m-0 text-[15px] leading-snug text-[#E3E8F2]">One of you did it. Open a suspect and question them.</p>
         <span className="label shrink-0 rounded-full px-2.5 py-1.5 text-snow" style={{ boxShadow: "inset 0 0 0 1px rgba(95,221,247,.5)" }}>
@@ -557,7 +619,7 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
 
       {you?.isHost ? (
         <button type="button" className="btn btn-primary tap mt-3" onClick={() => void actions.skip().catch(() => {})}>
-          Everyone ready? Vote now
+          End the discussion and vote
           <Arrow />
         </button>
       ) : (
@@ -683,6 +745,12 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
             <p className="eyebrow m-0">{first(poke.fromName)} is asking you · {pokeLeft}s</p>
             <p className="display m-0 mt-4 text-[clamp(28px,9vw,38px)]">{poke.question}</p>
             <p className="label mt-5">Answer out loud. Everyone is listening.</p>
+            {card?.story && (
+              <div className="panel mt-5 px-4 py-3 text-left">
+                <p className="label m-0 text-cyan">Your story</p>
+                <p className="m-0 mt-1 text-[15px] leading-snug">“{card.story}”</p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -696,6 +764,12 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
             <p className="display m-0 mt-3 text-[clamp(44px,15vw,64px)]">{first(hot.playerName)}</p>
             <p className="m-0 mt-4 text-[19px] leading-snug">{hot.question}</p>
             <p className="label mt-5">Answer out loud. Everyone is watching.</p>
+            {hot.playerId === you?.id && card?.story && (
+              <div className="panel mt-5 px-4 py-3 text-left">
+                <p className="label m-0 text-cyan">Your story</p>
+                <p className="m-0 mt-1 text-[15px] leading-snug">“{card.story}”</p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -748,6 +822,7 @@ export function Vote({ room, actions, secondsLeft }: Props) {
       <div className="mt-3 grid min-h-[240px] flex-1 auto-rows-fr grid-cols-2 gap-2.5 overflow-y-auto">
         {room.players.map((p, i) => {
           const mine = p.id === you?.id;
+          if (mine) return null;
           const on = (you?.votedFor ?? pick) === p.id;
           return (
             <button

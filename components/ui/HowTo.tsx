@@ -9,9 +9,9 @@ const STEPS = {
     ["Accuse", "Press Accuse and pick who did it. One of the four is lying."],
   ],
   party: [
-    ["Read your card", "Hold the scanner to see your secret role. Don't show anyone."],
-    ["Question everyone", "Open a suspect's card and question them. AI suspects answer on the spot. Friends have to answer out loud."],
-    ["Vote", "Tap the person you think did it, then lock it in. Most votes gets accused."],
+    ["Read the case and your card", "Everyone sees the case. Then you get a secret card: who you are, your story, and what you saw."],
+    ["Question each other", "Tell people what you saw. Ask where they were. One of you is the culprit and is lying."],
+    ["Vote", "Tap who you think did it and lock it in. If most of you pick the culprit, you win. If not, the culprit wins."],
   ],
 } as const;
 

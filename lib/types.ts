@@ -146,6 +146,8 @@ export interface PlayerCard {
   mission: string; // ONE line, e.g. "YOU ARE INNOCENT. Find who stole the rosogolla."
   clues: string[]; // exactly 2
   objective?: string; // culprit only
+  job?: string; // who you are in this case, e.g. "Head of security"
+  story?: string; // where you say you were: your answer when anyone asks
 }
 
 export interface RoomReveal {

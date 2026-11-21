@@ -27,11 +27,12 @@ export class GameError extends Error {
 }
 
 const SECONDS = {
-  normal: { briefing: 20, discuss: 100, vote: 30 },
-  demo: { briefing: 10, discuss: 45, vote: 20 },
+  // Briefing is long enough to read the case and your own card properly.
+  normal: { briefing: 45, discuss: 100, vote: 30 },
+  demo: { briefing: 15, discuss: 45, vote: 20 },
 };
 // Harder rooms get less time to argue. Every level still fits in three minutes.
-const DISCUSS_BY_LEVEL = { easy: 120, medium: 100, hard: 70 } as const;
+const DISCUSS_BY_LEVEL = { easy: 105, medium: 100, hard: 75 } as const;
 function timings(settings: RoomSettings) {
   if (settings.demo) return SECONDS.demo;
   return { ...SECONDS.normal, discuss: DISCUSS_BY_LEVEL[settings.difficulty ?? "medium"] };
@@ -129,9 +130,17 @@ function buildCard(file: CaseFile, playerId: string): PlayerCard {
       mission: "YOU ARE THE CULPRIT. Lie. Blame someone else.",
       clues,
       objective: file.culprit_objective,
+      job: me.role,
+      story: me.public_alibi,
     };
   }
-  return { role: "innocent", mission: `YOU ARE INNOCENT. Find who ${file.crime_verb}.`, clues };
+  return {
+    role: "innocent",
+    mission: `YOU ARE INNOCENT. Find who ${file.crime_verb}.`,
+    clues,
+    job: me.role,
+    story: me.public_alibi,
+  };
 }
 
 export async function startRoom(
