@@ -44,7 +44,7 @@ Design the complete mobile UI for **"Kaun?"**, a 3-minute AI mystery party game 
 
 11. **Reveal** — Dramatic: stamp "CASE CLOSED" or "CULPRIT ESCAPED". Culprit name huge. The narrator's story text with a **Play audio / Replay** button. Vote breakdown (who voted for whom). Solo version shows a detective score (time, clues found, verdict).
 
-12. **Share card** — A vertical 1080×1920 "newspaper front page" for Instagram Stories: headline ("BREAKING: Aarav arrested in KC Das rosogolla heist"), one-line roast, vote breakdown, "Play at kaun.vercel.app". Buttons under it: **Download**, **Play again (same room)**.
+12. **Share card** — A vertical 1080×1920 "newspaper front page" for Instagram Stories: headline ("BREAKING: Aarav arrested in KC Das rosogolla heist"), one-line roast, vote breakdown, "Play at playkaun.vercel.app". Buttons under it: **Download**, **Play again (same room)**.
 
 ## States to include
 Loading, error ("The detective lost signal. Retry"), reconnecting banner, empty lobby, timer under 20 s, vote locked.
