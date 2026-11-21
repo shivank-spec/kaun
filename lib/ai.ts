@@ -102,3 +102,25 @@ export async function chatJSON(c: JsonCall): Promise<unknown> {
   if (!process.env.OPENAI_API_KEY) throw new Error("all AI providers failed");
   return callJSON(openai(), OPENAI_MODEL, c, c.openaiTimeoutMs ?? 14000, false);
 }
+
+/** Health check: which providers answer right now. Never returns keys. */
+export async function probe() {
+  const c: JsonCall = { system: "Reply with JSON only.", user: 'Return {"ok":true}', maxTokens: 200, temperature: 0 };
+  const test = async (fn: () => Promise<unknown>) => {
+    const t = Date.now();
+    try {
+      await fn();
+      return `ok ${Date.now() - t}ms`;
+    } catch (e) {
+      return `FAIL ${(e as Error).message.slice(0, 160)}`;
+    }
+  };
+  const out: Record<string, string> = {};
+  out.gemini = process.env.GEMINI_API_KEY
+    ? await test(() => callJSON(gemini(), GEMINI_MODEL, c, 9000, false))
+    : "no key";
+  for (const m of [BIG, SMALL, ALT]) {
+    out[m] = process.env.GROQ_API_KEY ? await test(() => callJSON(groq(), m, c, 8000, true)) : "no key";
+  }
+  return out;
+}
