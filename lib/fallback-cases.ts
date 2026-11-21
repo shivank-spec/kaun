@@ -1,398 +1,518 @@
 import type { CaseFile } from "./types";
 
-// Backup cases used when the AI is slow or returns a broken puzzle, so the game
-// never stalls on stage. Written by the case engine during the build, then frozen.
+// Backup cases used when the AI is busy, so the game never stalls.
+// Written by the case engine during the build, then frozen. Neutral settings:
+// no city, no real street, so anyone anywhere can follow them.
 export const FALLBACK_CASES: CaseFile[] = [
   {
-    "title": "The Salt Lake Data Heist",
-    "setting": "Tech startup NexusAI, Salt Lake Sector V, Bangalore, 9 pm‑12 am, night before Series A funding round",
-    "crime": "unauthorized extraction of proprietary source code and client data from the company server",
-    "crime_verb": "exfiltrated the source code and client data",
-    "intro": "The clock struck nine as the office lights dimmed, but the servers kept humming. NexusAI’s future hinged on a demo that would unveil tomorrow, yet a silent intruder slipped through the digital walls and walked away with the company’s most valuable asset.",
-    "suspects": [
-      {
-        "id": "s1",
-        "name": "Rohit Banerjee",
-        "role": "Head of Product",
-        "persona": "Meticulous, data‑driven, speaks in measured bullet points",
-        "speaking_style": "Rohit: \"The sprint metrics show a 12% variance, we need to address it.\"",
-        "public_alibi": "Attended a virtual board meeting from 9:15 pm to 10:30 pm, screen share logged",
-        "innocent_secret": "Has been negotiating a silent exit with a rival startup"
-      },
-      {
-        "id": "s2",
-        "name": "Maya Ghosh",
-        "role": "Senior DevOps Engineer",
-        "persona": "Calm under pressure, uses tech slang, concise",
-        "speaking_style": "Maya: \"Pinged the firewall, everything's green. No anomalies.\"",
-        "public_alibi": "Was on a video call with the cloud vendor from 9:45 pm to 10:20 pm, call logs present",
-        "innocent_secret": "Was planning a surprise birthday party for her sister, bought a cake at 10 pm"
-      },
-      {
-        "id": "s3",
-        "name": "Arun Chatterjee",
-        "role": "Lead Software Architect",
-        "persona": "Charismatic, persuasive, often uses rhetorical questions",
-        "speaking_style": "Arun: \"If we don't secure this, who's to blame?\"",
-        "public_alibi": "Left the office at 9:30 pm, claimed to go home for a family dinner",
-        "innocent_secret": "Had a secret meeting with an investor from a competing firm at 10 pm"
-      },
-      {
-        "id": "s4",
-        "name": "Sneha Dutta",
-        "role": "Finance Manager",
-        "persona": "Detail‑oriented, formal, often cites numbers",
-        "speaking_style": "Sneha: \"The expense report shows a Rs 2.3 lakh variance, we must audit.\"",
-        "public_alibi": "Was reconciling invoices in the finance room from 9:00 pm to 10:05 pm, badge swipe recorded",
-        "innocent_secret": "Borrowed Rs 1.5 lakh from a loan shark to cover her sister's medical bills"
-      }
-    ],
-    "culprit_id": "s3",
-    "motive": "Earn a lucrative consulting contract from the rival investor by delivering the stolen code",
-    "method": "Used his admin access to clone the /var/www/nexus repo to an external USB, then slipped it out during his ‘family dinner’ alibi",
-    "timeline": [
-      "21:00 Server logs show admin login from Arun’s credentials",
-      "21:12 CCTV captures Arun exiting through side door, badge swipe recorded",
-      "21:25 Maya’s firewall monitor shows a brief 30‑second outbound data spike",
-      "21:40 Rohit’s screen share ends, he logs off workstation",
-      "22:00 Sneha’s badge used to enter finance room, no server activity",
-      "22:30 USB device detected on endpoint at 22:31, later removed"
-    ],
     "clues": [
       {
         "id": "c1",
-        "text": "Server log entry: admin user ‘arunch’ accessed /var/www/nexus at 21:00 and executed ‘git clone’",
-        "held_by": "s2",
-        "points_to": "s3",
+        "text": "Handprint on case seen by guard",
+        "held_by": "s1",
+        "points_to": "s4",
         "is_red_herring": false
       },
       {
         "id": "c2",
-        "text": "CCTV frame 21:12 shows Arun’s badge on side‑door reader, but his badge was reported missing later",
-        "held_by": "s4",
-        "points_to": "s3",
+        "text": "Security log shows door unlocked at 11:45",
+        "held_by": "s2",
+        "points_to": "s4",
         "is_red_herring": false
       },
       {
         "id": "c3",
-        "text": "USB forensic report: device ID matches the encrypted drive Arun purchased last month",
+        "text": "Receipt for rare book at 10:30",
+        "held_by": "s3",
+        "points_to": "s4",
+        "is_red_herring": false
+      },
+      {
+        "id": "c4",
+        "text": "Phone call to ex at 11:10",
+        "held_by": "s1",
+        "points_to": "s2",
+        "is_red_herring": true
+      },
+      {
+        "id": "c5",
+        "text": "Muddy footprint near window",
+        "held_by": "s3",
+        "points_to": "s1",
+        "is_red_herring": true
+      }
+    ],
+    "crime": "Swapped the manuscript for a replica",
+    "facts": {
+      "what": "Rare manuscript stolen",
+      "when": "11:15‑12:30",
+      "where": "Display case, East Wing"
+    },
+    "intro": "The night air was thick with anticipation as the museum opened its doors to a rare collection. A silent, unseen hand moved among the artifacts, leaving only a whisper of deceit.",
+    "roast": "You thought you could clean up a crime, Varun—turns out you were just a janitor in a bad play.",
+    "title": "The Missing Manuscript",
+    "method": "Swapped the original manuscript with a replica during the shift change",
+    "motive": "Pay off gambling debt",
+    "setting": "Night of the New Exhibition at a City Museum",
+    "suspects": [
+      {
+        "id": "s1",
+        "name": "Sana Kapoor",
+        "role": "Security Guard",
+        "persona": "Stoic, observant",
+        "public_alibi": "I was on watch from 10:00‑12:00",
+        "speaking_style": "Matter‑of‑fact",
+        "innocent_secret": "I cleaned the display case early"
+      },
+      {
+        "id": "s4",
+        "name": "Varun Chatterjee",
+        "role": "Cleaner",
+        "persona": "Quiet, practical",
+        "public_alibi": "I was sweeping the hallway at 11:30",
+        "speaking_style": "Brief",
+        "innocent_secret": "I was preparing the exhibit, had to move the case"
+      },
+      {
+        "id": "s2",
+        "name": "Siddharth Sen",
+        "role": "Manager",
+        "persona": "Authoritative, meticulous",
+        "public_alibi": "I handled inventory at 11:20",
+        "speaking_style": "Direct",
+        "innocent_secret": "I called my sister for advice"
+      },
+      {
+        "id": "s3",
+        "name": "Aisha Bose",
+        "role": "Curator",
+        "persona": "Enthusiastic, detail‑oriented",
+        "public_alibi": "I met a scholar at the library at 11:45",
+        "speaking_style": "Descriptive",
+        "innocent_secret": "I met a scholar at the library"
+      }
+    ],
+    "timeline": [
+      "11:15 11:15 pm Shift change starts",
+      "11:30 11:30 pm Culprit swaps the manuscript",
+      "12:00 12:00 pm Security logs door unlock",
+      "12:30 12:30 pm Culprit leaves the museum"
+    ],
+    "alibi_hole": "Door card swipe shows Varun's card at 11:30",
+    "crime_verb": "Find who swapped the manuscript for a fake",
+    "culprit_id": "s4",
+    "ending_caught": "Varun was caught when the museum’s new security system logged his card swipe at 11:30. His planned swap unraveled with a single misplaced fingerprint.",
+    "ending_escaped": "Varun slipped through the back exit, claiming he was sweeping. The guard’s brief, unverified statement and the empty hallway let him vanish into the night.",
+    "culprit_objective": "Convince everyone the CCTV was already down at 11:20"
+  },
+  {
+    "clues": [
+      {
+        "id": "c1",
+        "text": "A single, pristine coffee cup found near the server room door.",
+        "held_by": "s1",
+        "points_to": "s4",
+        "is_red_herring": false
+      },
+      {
+        "id": "c2",
+        "text": "Security footage shows Varun Sen leaving his station at 1:15 AM.",
+        "held_by": "s3",
+        "points_to": "s2",
+        "is_red_herring": true
+      },
+      {
+        "id": "c3",
+        "text": "A faint smudge of non-standard lubricant on the server rack's access panel.",
+        "held_by": "s2",
+        "points_to": "s4",
+        "is_red_herring": false
+      },
+      {
+        "id": "c4",
+        "text": "Aditya Roy's access card was used to enter the server room floor at 11:30 PM.",
+        "held_by": "s4",
+        "points_to": "s3",
+        "is_red_herring": true
+      },
+      {
+        "id": "c5",
+        "text": "A USB drive with a cracked screen left behind in the server room.",
+        "held_by": "s3",
+        "points_to": "s4",
+        "is_red_herring": false
+      }
+    ],
+    "crime": "The company's flagship software source code was stolen.",
+    "facts": {
+      "what": "Proprietary source code for 'Project Chimera'.",
+      "when": "Between 11:00 PM and 5:00 AM.",
+      "where": "Apex Innovations' secure server room."
+    },
+    "intro": "The air in Apex Innovations crackled with anticipation. Tonight, the future of the company, their revolutionary new OS, was secured. But as dawn broke, the digital vault lay empty. The code, years of work, was gone.",
+    "roast": "She thought a bit of ambition and a cracked USB would be her ticket to the big leagues. Turns out, ambition without competence is just a faster way to get caught.",
+    "title": "The Leaked Source Code",
+    "method": "Used her administrative access, gained during her probation period, to copy the code to a hidden partition on her personal drive.",
+    "motive": "Financial gain by selling the code to a rival company.",
+    "setting": "Apex Innovations' sleek, modern office, the night before a major product launch.",
+    "suspects": [
+      {
+        "id": "s4",
+        "name": "Riya Sarkar",
+        "role": "Junior Coder",
+        "persona": "Quiet, observant, and often underestimated. Eager to prove her worth.",
+        "public_alibi": "Worked late in her cubicle, left at 2:00 AM.",
+        "speaking_style": "Soft-spoken, hesitant, but observant of details.",
+        "innocent_secret": "Was practicing a complex coding challenge for an upcoming hackathon."
+      },
+      {
+        "id": "s2",
+        "name": "Varun Sen",
+        "role": "Network Administrator",
+        "persona": "Methodical, cautious, and fiercely loyal to the company's security protocols.",
+        "public_alibi": "Monitored server activity from the main security desk all night.",
+        "speaking_style": "Precise, calm, uses technical jargon sparingly.",
+        "innocent_secret": "Has a gambling debt he's desperately trying to hide."
+      },
+      {
+        "id": "s3",
+        "name": "Aditya Roy",
+        "role": "Product Manager",
+        "persona": "Smooth, persuasive, and always looking for an angle. Stressed about the launch's success.",
+        "public_alibi": "Left at 10:00 PM after a final launch review meeting.",
+        "speaking_style": "Polite, slightly evasive, uses business buzzwords.",
+        "innocent_secret": "Was secretly meeting with a venture capitalist about a side project."
+      },
+      {
+        "id": "s1",
+        "name": "Kavya Chatterjee",
+        "role": "Lead Developer",
+        "persona": "Ambitious, brilliant, and slightly arrogant. Believes she deserves more recognition.",
+        "public_alibi": "Was debugging in the quiet zone until midnight, then left.",
+        "speaking_style": "Technical, direct, with a hint of impatience.",
+        "innocent_secret": "Secretly took a confidential competitor's interview earlier that week."
+      }
+    ],
+    "timeline": [
+      "11:00 PM: Server room access log shows a routine check by Varun Sen.",
+      "1:30 AM: Riya Sarkar is seen leaving her cubicle, heading towards the server room area.",
+      "1:45 AM: A brief, unscheduled power fluctuation is detected in the server room.",
+      "2:00 AM: Riya Sarkar swipes out at the main entrance.",
+      "3:00 AM: Kavya Chatterjee is seen briefly in the server room corridor.",
+      "4:30 AM: The main server begins its backup cycle, revealing the missing code."
+    ],
+    "alibi_hole": "Riya Sarkar claimed to leave at 2:00 AM, but her final security log-out was at 2:05 AM.",
+    "crime_verb": "stole the company's source code",
+    "culprit_id": "s4",
+    "ending_caught": "Riya Sarkar's quiet demeanor masked a calculated betrayal. The cracked USB drive contained fragments of the stolen code, a signature left by her desperate ambition. Her minor delay in exiting, a mere five minutes, unraveled her entire scheme.",
+    "ending_escaped": "Riya Sarkar blended back into the anonymity of the night, the valuable source code a ghost in the digital ether. The company was left shattered, their future compromised, and Riya was already on a plane, code in hand, to a new, lucrative life.",
+    "culprit_objective": "To make it appear as though the breach happened during a system glitch between 1:30 AM and 2:00 AM."
+  },
+  {
+    "clues": [
+      {
+        "id": "c1",
+        "text": "A faint smudge of grease found on the vault door handle.",
         "held_by": "s1",
         "points_to": "s3",
         "is_red_herring": false
       },
       {
+        "id": "c2",
+        "text": "Security logs show a brief, unexplained power fluctuation in the vault corridor.",
+        "held_by": "s2",
+        "points_to": "s3",
+        "is_red_herring": false
+      },
+      {
+        "id": "c3",
+        "text": "A torn piece of paper with gambling syndicate symbols found near the vault.",
+        "held_by": "s4",
+        "points_to": "s3",
+        "is_red_herring": false
+      },
+      {
         "id": "c4",
-        "text": "Maya’s call log shows a 10 pm call to a cake shop, explaining her ‘vendor’ call",
+        "text": "Yash Sinha was seen talking to a person outside the studio gates.",
         "held_by": "s2",
         "points_to": "s1",
         "is_red_herring": true
       },
       {
         "id": "c5",
-        "text": "Sneha’s expense sheet lists a Rs 2.3 lakh purchase of a ‘consultancy fee’ to a shell company linked to Arun",
-        "held_by": "s4",
-        "points_to": "s2",
-        "is_red_herring": true
-      }
-    ],
-    "alibi_hole": "Badge swipe at 21:12 proves Arun was in the building after he claimed to have left at 21:30",
-    "culprit_objective": "Convince everyone the USB was a company backup drive left for maintenance",
-    "ending_caught": "When investigators pieced together the admin log, CCTV badge swipe, and the USB forensic match, they traced the stolen repository straight to Arun’s personal encrypted drive. Confronted, he tried to claim the drive was a routine backup, but the timestamps and his missing badge shattered the lie. He was arrested at his home that night, the rival investor’s offer rescinded.",
-    "ending_escaped": "If the badge swipe had been missed, Arun’s alibi of a family dinner would have held. He could have slipped the USB out, feigned a backup, and vanished with the code, leaving NexusAI to scramble for a new demo and lose its Series A round. The missing badge was his only undoing.",
-    "roast": "Arun swapped a brilliant architect’s mind for a burglar’s conscience—still can’t design a solid alibi."
-  },
-  {
-    "title": "The Final Cut Heist",
-    "setting": "Tollygunge film studio, last day of shooting for a high‑budget period drama. The set includes the main hall, costume warehouse, editing suite, and the on‑site server room.",
-    "crime": "The original digital master of the film was replaced with a low‑resolution copy, wiping out weeks of post‑production work.",
-    "crime_verb": "replaced the master file with a fake",
-    "intro": "The studio was buzzing on the final wrap. When the editor opened the server at 18:45, the 4‑K master was gone, replaced by a grainy proxy. No one saw anyone tamper with the rack, but the loss would cost the producers millions.",
-    "suspects": [
-      {
-        "id": "s1",
-        "name": "Arun Basu",
-        "role": "Chief Editor",
-        "persona": "Meticulous, weary, jargon‑laden",
-        "speaking_style": "Technical, precise, often cites frame rates",
-        "public_alibi": "Was in the editing suite reviewing color grades from 17:30‑18:20",
-        "innocent_secret": "Had an unpaid loan from a rival production house"
-      },
-      {
-        "id": "s2",
-        "name": "Maya Dutta",
-        "role": "Costume Supervisor",
-        "persona": "Sharp, impatient, practical",
-        "speaking_style": "Short sentences, blunt, uses industry slang",
-        "public_alibi": "Was in the costume warehouse inventorying props from 17:45‑18:30",
-        "innocent_secret": "Was secretly negotiating a freelance gig for the next shoot"
-      },
-      {
-        "id": "s3",
-        "name": "Rohit Chatterjee",
-        "role": "IT Manager",
-        "persona": "Calm, methodical, slightly sarcastic",
-        "speaking_style": "Dry humor, often references code versions",
-        "public_alibi": "Was fixing a printer in the lobby from 17:50‑18:10",
-        "innocent_secret": "Had a side‑project selling pirated VFX plugins"
-      },
-      {
-        "id": "s4",
-        "name": "Leena Ghosh",
-        "role": "Assistant Director",
-        "persona": "Nervous, eager, detail‑oriented",
-        "speaking_style": "Polite, repeats directives, frequent “sir”",
-        "public_alibi": "Was on set coordinating actors from 17:40‑18:15",
-        "innocent_secret": "Was meeting a former lover who works at a rival studio"
-      }
-    ],
-    "culprit_id": "s3",
-    "motive": "Earn money by selling the 4‑K master to a streaming rival, then erase evidence",
-    "method": "Used his admin access to copy the master to an external SSD, then swapped the file on the server with a low‑res proxy, covering tracks by clearing the audit log",
-    "timeline": [
-      "17:45 Maya finishes inventory, exits warehouse",
-      "17:50 Rohit logs into server for routine backup",
-      "18:00 Arun leaves editing suite, walks past server room",
-      "18:07 Rohit copies master to SSD, deletes original, uploads proxy",
-      "18:12 Leena checks shot list, sees server activity on her phone",
-      "18:45 Editor discovers missing master"
-    ],
-    "clues": [
-      {
-        "id": "c1",
-        "text": "Server log shows admin login at 18:03 from Rohit’s workstation ID",
+        "text": "Neil D'Souza's tool bag has a small dent matching a prop casing.",
         "held_by": "s1",
-        "points_to": "s3",
-        "is_red_herring": false
-      },
-      {
-        "id": "c2",
-        "text": "A fingerprint on the server rack door matches Rohit’s badge",
-        "held_by": "s2",
-        "points_to": "s3",
-        "is_red_herring": false
-      },
-      {
-        "id": "c3",
-        "text": "Network packet capture shows a 500 MB file transfer to an external USB device at 18:06",
-        "held_by": "s4",
-        "points_to": "s3",
-        "is_red_herring": false
-      },
-      {
-        "id": "c4",
-        "text": "A torn receipt for a new costume fabric dated 18:05, found in Maya’s locker",
-        "held_by": "s3",
-        "points_to": "s2",
-        "is_red_herring": true
-      },
-      {
-        "id": "c5",
-        "text": "A text message from Leena to her ex about meeting at 18:04, printed from the studio printer",
-        "held_by": "s2",
         "points_to": "s4",
         "is_red_herring": true
       }
     ],
-    "alibi_hole": "Rohit’s printer‑fix claim is busted by CCTV showing him at the server room at 18:04",
-    "culprit_objective": "Convince everyone the server’s audit log auto‑cleared at 18:05 due to a scheduled maintenance",
-    "ending_caught": "Rohit thought a quick copy and log wipe would slip past everyone. The admin login, his fingerprint, and the USB transfer sealed his fate. When we cross‑checked the server’s checksum with the backup, the tamper was obvious, and the SSD he tried to pawn was traced back to his desk. He’s under arrest, his side‑project dead.",
-    "ending_escaped": "If Rohit had destroyed the external SSD before the raid, the copy would have vanished and the audit‑log claim might have held. Without the physical drive, the only proof would be the log, which he’d already scrubbed. He’d walk out, his secret sale intact.",
-    "roast": "Rohit tried to edit his own story, but the only thing he edited was his credibility."
-  },
-  {
-    "title": "The Midnight Leak at Vibe Coders",
-    "setting": "AIC Techno hackathon floor, Calcutta AI Club, Kolkata – last hour before submissions, judges' desk, score sheets, prize cheque, Wi‑Fi rack, sponsor's prototype on display",
-    "crime": "source code of sponsor's prototype was exfiltrated and posted online",
-    "crime_verb": "leaked the prototype code",
-    "intro": "The clock ticked toward the final submission deadline. Amid the clatter of keyboards, the prized prototype from TechNova vanished from the secure rack, its code appearing on a public forum minutes later. No one saw a hand, but the digital trail was unmistakable.",
+    "crime": "The master copy of the director's cut film reel.",
+    "facts": {
+      "what": "Master film reel",
+      "when": "Between 10 PM and 2 AM last night",
+      "where": "The secure vault on Stage 4"
+    },
+    "intro": "The final day of shooting. A dream project, weeks behind schedule, and now, disaster strikes. The master reel, the sole copy of the director's cut, has vanished. Without it, the film is dead in the water.",
+    "roast": "He tried to play director, but ended up just a prop in his own downfall.",
+    "title": "The Missing Master Reel",
+    "method": "Used his access as Assistant Director to bypass security protocols and remove the reel during a shift change, then hid it in a prop crate.",
+    "motive": "To sell the reel to a rival production company to cover gambling debts.",
+    "setting": "A bustling film studio on the final day of shooting. Chaos reigns supreme.",
     "suspects": [
       {
-        "id": "s1",
-        "name": "Arun Basu",
-        "role": "Lead Mentor, Calcutta AI Club",
-        "persona": "Methodical, precise, speaks in measured technical jargon",
-        "speaking_style": "Arun explains every step as if debugging a program, rarely uses slang",
-        "public_alibi": "Was reviewing submissions at Mentor Table 3 from 18:45 to 19:05",
-        "innocent_secret": "Had a pending job interview with a rival AI startup, kept it hidden to avoid conflict of interest"
-      },
-      {
-        "id": "s2",
-        "name": "Maya Ghosh",
-        "role": "Logistics Coordinator",
-        "persona": "Energetic, pragmatic, uses concise commands",
-        "speaking_style": "Maya gives short, action‑oriented directives, often punctuated with \"okay?\"",
-        "public_alibi": "Was supervising the catering area from 18:40 to 19:10",
-        "innocent_secret": "Owes a significant sum to a loan shark, paying weekly under the table"
-      },
-      {
         "id": "s3",
-        "name": "Rajat Chatterjee",
-        "role": "Senior Developer, participating team \"QuantumQuirk\"",
-        "persona": "Quiet, analytical, speaks in low‑volume, technical terms",
-        "speaking_style": "Rajat answers questions with terse, data‑driven sentences, rarely elaborates",
-        "public_alibi": "Was at the judges' desk calibrating his team's demo from 18:50 to 19:12",
-        "innocent_secret": "Had been secretly negotiating a freelance contract with TechNova to develop a competing product"
+        "name": "Imran Jalan",
+        "role": "Assistant Director",
+        "persona": "Ambitious, slightly arrogant, always in control.",
+        "public_alibi": "Coordinating the final shots, supervising the crew on set.",
+        "speaking_style": "Confident, often condescending, uses industry jargon.",
+        "innocent_secret": "Has a significant gambling debt he's desperately trying to hide."
       },
       {
         "id": "s4",
-        "name": "Lila Sen",
-        "role": "Security Officer, AIC Techno venue",
-        "persona": "Authoritative, by‑the‑book, uses formal security language",
-        "speaking_style": "Lila reports incidents with exact timestamps and protocol references",
-        "public_alibi": "Patrolled the main corridor and logged a checkpoint at 19:00 on the east wing",
-        "innocent_secret": "Is a member of a local activist group that opposes corporate sponsorships"
+        "name": "Neil D'Souza",
+        "role": "Sound Mixer",
+        "persona": "Gruff, cynical, seen it all.",
+        "public_alibi": "Packing up sensitive equipment in Studio 2, across the lot.",
+        "speaking_style": "Sarcastic and blunt, dismissive of studio drama.",
+        "innocent_secret": "Accidentally damaged a piece of expensive equipment and was trying to fix it."
+      },
+      {
+        "id": "s1",
+        "name": "Yash Sinha",
+        "role": "Studio Security Guard",
+        "persona": "Overly eager to please, a bit jumpy.",
+        "public_alibi": "Patrolling the main lot, saw nothing unusual.",
+        "speaking_style": "Polite but anxious, speaks quickly.",
+        "innocent_secret": "Was secretly meeting his girlfriend on a remote part of the lot."
+      },
+      {
+        "id": "s2",
+        "name": "Mira Fernandes",
+        "role": "Lead Editor",
+        "persona": "Calm, collected, and incredibly organized.",
+        "public_alibi": "Working late in the editing suite, just down the hall.",
+        "speaking_style": "Measured and precise, avoids speculation.",
+        "innocent_secret": "Fell asleep at her desk for an hour, missed a crucial part of the timeline."
       }
     ],
-    "culprit_id": "s3",
-    "motive": "Earn a lucrative freelance contract by delivering the prototype code to a competitor",
-    "method": "Used his access badge to swipe the Wi‑Fi rack at 19:03, plugged a covert USB‑C dongle into the rack’s console, copied the source, then uploaded via an encrypted VPN before leaving the floor",
     "timeline": [
-      "18:45 Arun begins reviewing late submissions",
-      "18:50 Rajat moves to judges' desk to test demo",
-      "19:00 Lila logs east‑wing checkpoint; Wi‑Fi rack access log shows badge Rajat entry",
-      "19:03 Rajat initiates data copy, VPN connection established",
-      "19:07 Code appears on public forum, timestamp 19:07:12 UTC",
-      "19:12 Rajat returns to his workstation, claims he was debugging",
-      "19:15 Investigation team secures scene"
+      "10:00 PM: Final scene wraps, actors leave.",
+      "11:30 PM: Crew begins packing; reel is secured in vault.",
+      "1:15 AM: Imran Jalan is seen near the vault entrance.",
+      "1:45 AM: Reel is reported missing by Yash Sinha.",
+      "2:00 AM: Imran Jalan supervises prop removal from Stage 4."
     ],
+    "alibi_hole": "He claimed to be on set, but camera footage shows him by the vault.",
+    "crime_verb": "stole the master film reel",
+    "culprit_id": "s3",
+    "ending_caught": "Imran Jalan thought he was too clever, too in control. He underestimated the grease on the vault door and the symbols of his desperation. The reel was found stashed in a prop coffin, just as the buyer arrived.",
+    "ending_escaped": "The betting slips were too damning, the contact too exposed. A quick call to his fence, a desperate gamble, and Imran Jalan vanished into the night, the master reel a ghost in the bustling studio.",
+    "culprit_objective": "To make it look like a random security failure or an outside job."
+  },
+  {
     "clues": [
       {
         "id": "c1",
-        "text": "CCTV frame 19:02 shows Rajat's badge swiping the rack door",
-        "held_by": "s1",
-        "points_to": "s3",
-        "is_red_herring": false
-      },
-      {
-        "id": "c2",
-        "text": "Network log: encrypted VPN tunnel opened from Rajat's laptop MAC 00:1A:2B:3C:4D:5E",
-        "held_by": "s2",
-        "points_to": "s3",
-        "is_red_herring": false
-      },
-      {
-        "id": "c3",
-        "text": "USB‑C dongle serial XJ-900 found in the trash near the judges' desk, fingerprint matches Rajat",
-        "held_by": "s4",
-        "points_to": "s3",
-        "is_red_herring": false
-      },
-      {
-        "id": "c4",
-        "text": "A torn receipt for a coffee purchase at 18:55 under Arun's name",
+        "text": "Fingerprint on trophy handle",
         "held_by": "s2",
         "points_to": "s1",
-        "is_red_herring": true
-      },
-      {
-        "id": "c5",
-        "text": "A handwritten note about a meeting with a loan shark, found in Maya's locker",
-        "held_by": "s4",
-        "points_to": "s2",
-        "is_red_herring": true
-      }
-    ],
-    "alibi_hole": "Badge access log shows Rajat entered the Wi‑Fi rack at 19:03, contradicting his claim of being at the judges' desk",
-    "culprit_objective": "Convince everyone the VPN outage at 19:04 was a network glitch, not a data exfiltration",
-    "ending_caught": "When the forensic team traced the VPN tunnel back to Rajat's MAC, the fingerprint on the discarded dongle sealed his fate. Confronted with the badge swipe and CCTV stills, Rajat could not deny the copy. He was escorted out, his freelance deal collapsed, and the stolen code was recovered from his personal cloud backup.",
-    "ending_escaped": "Rajat feigned a sudden power failure, claimed his laptop crashed, and slipped the USB‑C dongle into his bag unnoticed. He left the venue before security could lock the exits, and the encrypted upload continued from a mobile hotspot, vanishing his trail. The prototype code remained online, and he disappeared into the night with a new contract.",
-    "roast": "Rajat proved that even a quiet coder can make the loudest mistake—leaving a digital fingerprint bigger than his ego."
-  },
-  {
-    "title": "The Camac Street Heist",
-    "setting": "Camac Street jewellery showroom, Kolkata – private viewing 9‑11 pm, 12 Oct 2023",
-    "crime": "theft of a 2‑carat sapphire necklace worth ₹4.2 million",
-    "crime_verb": "stole the sapphire necklace",
-    "intro": "The showroom glittered under soft chandeliers as elite clients examined the latest collection. At 10:27 pm, the display case was found empty, the alarm silent, and the night’s star piece vanished without a trace.",
-    "suspects": [
-      {
-        "id": "s1",
-        "name": "Arindam Banerjee",
-        "role": "Senior sales manager",
-        "persona": "meticulous, corporate‑spoken",
-        "speaking_style": "formal and data‑driven",
-        "public_alibi": "was on a Zoom call with a European buyer from 9:45‑10:30",
-        "innocent_secret": "has been secretly negotiating a job with a rival showroom"
-      },
-      {
-        "id": "s2",
-        "name": "Madhuri Dutta",
-        "role": "Head of security",
-        "persona": "no‑nonsense, terse",
-        "speaking_style": "brief, commands only",
-        "public_alibi": "checked perimeter cameras from 9:30‑10:15 and logged a patrol at 10:20",
-        "innocent_secret": "receives monthly cash gifts from a vendor for preferred lighting contracts"
-      },
-      {
-        "id": "s3",
-        "name": "Partha Sen",
-        "role": "IT systems administrator",
-        "persona": "quiet, technical, prefers brevity",
-        "speaking_style": "dry, uses acronyms",
-        "public_alibi": "was troubleshooting the server room issue from 9:50‑10:40, witnessed by a junior tech",
-        "innocent_secret": "has a gambling debt of ₹3 lakh and was planning a high‑stakes bet"
-      },
-      {
-        "id": "s4",
-        "name": "Shreya Ghosh",
-        "role": "Creative director",
-        "persona": "artistic, expressive, emotive",
-        "speaking_style": "florid, uses metaphors",
-        "public_alibi": "was in the lounge drafting the next campaign from 9:30‑10:35, colleagues saw her at the coffee machine",
-        "innocent_secret": "has been secretly dating a client’s son, a relationship frowned upon by her family"
-      }
-    ],
-    "culprit_id": "s3",
-    "motive": "to liquidate the debt before the bookmaker collected",
-    "method": "used his admin privileges to disable the case’s motion sensors at 10:12, slipped a replica key into the lock, and exited through the service back‑door, swapping the necklace with a pre‑made replica stored in his locker",
-    "timeline": [
-      "09:45 Showroom opens for private viewing",
-      "10:12 Partha disables motion sensors via backend console",
-      "10:22 Madhuri conducts routine camera check, notes nothing abnormal",
-      "10:27 Display case found empty; alarm triggers",
-      "10:35 Security team seals exits; forensic team called"
-    ],
-    "clues": [
-      {
-        "id": "c1",
-        "text": "CCTV backup from the server room shows Partha’s badge swiped at 10:11",
-        "held_by": "s2",
-        "points_to": "s3",
         "is_red_herring": false
       },
       {
         "id": "c2",
-        "text": "A fingerprint on the replica key matches Partha’s left thumb",
-        "held_by": "s4",
-        "points_to": "s3",
-        "is_red_herring": false
-      },
-      {
-        "id": "c3",
-        "text": "Server logs indicate the motion‑sensor disable command originated from Partha’s workstation IP 10.2.5.23",
-        "held_by": "s1",
-        "points_to": "s3",
-        "is_red_herring": false
-      },
-      {
-        "id": "c4",
-        "text": "A torn receipt for a high‑end lock‑pick set found in Madhuri’s locker",
+        "text": "Video frame of shadow near trophy",
         "held_by": "s3",
+        "points_to": "s1",
+        "is_red_herring": false
+      },
+      {
+        "id": "c3",
+        "text": "Note in locker B saying replace tomorrow",
+        "held_by": "s4",
+        "points_to": "s1",
+        "is_red_herring": false
+      },
+      {
+        "id": "c4",
+        "text": "Broken lock key in trash",
+        "held_by": "s1",
         "points_to": "s2",
         "is_red_herring": true
       },
       {
         "id": "c5",
-        "text": "A text message from Arindam to a rival showroom about “the big move tomorrow”",
-        "held_by": "s2",
-        "points_to": "s1",
+        "text": "Missing ticket stub from match day",
+        "held_by": "s3",
+        "points_to": "s4",
         "is_red_herring": true
       }
     ],
-    "alibi_hole": "Server logs show Partha’s workstation accessed the sensor panel at 10:11, contradicting his claim of being in the server rack area",
-    "culprit_objective": "Convince everyone the sensor outage was a spontaneous system glitch unrelated to any person",
-    "ending_caught": "Partha Sen thought his admin rights made him invisible. The forensic team reconstructed the exact seconds the motion sensors went dark, matched it to his badge swipe, and the fingerprint on the replica key sealed his fate. Under interrogation he confessed, citing the looming gambling debt as his only motive.",
-    "ending_escaped": "Partha had hidden the real necklace in a concealed compartment of his office chair, planning to retrieve it later. He left the showroom under the pretense of checking the network, boarded a cab to Delhi, and the necklace vanished from the evidence room before the police could secure it.",
-    "roast": "Partha proved that a quiet IT guy can be loud in the courtroom, especially when his alibi is a server log he can’t delete."
+    "crime": "swapped the trophy for a fake",
+    "facts": {
+      "what": "trophy swapped",
+      "when": "3:45 pm",
+      "where": "locker room B"
+    },
+    "intro": "The championship trophy vanished from locker room B at 3:45 pm. A silent theft rattled the stadium’s security team.",
+    "roast": "Nikhil Rao, the only guard who could swipe a trophy without a security breach.",
+    "title": "The Missing Trophy",
+    "method": "used his badge to access locker B, swapped trophy, left no trace",
+    "motive": "to cover a secret security system deal",
+    "setting": "Stadium locker room B on match day",
+    "suspects": [
+      {
+        "id": "s3",
+        "name": "Farhan Mehta",
+        "role": "cleaner",
+        "persona": "quiet, detail‑oriented",
+        "public_alibi": "cleaning locker rooms at 3:43 pm",
+        "speaking_style": "soft",
+        "innocent_secret": "taking a late‑night call from a friend"
+      },
+      {
+        "id": "s4",
+        "name": "Sana Mitra",
+        "role": "chef",
+        "persona": "energetic, practical",
+        "public_alibi": "preparing concessions at 3:41 pm",
+        "speaking_style": "cheerful",
+        "innocent_secret": "meeting a supplier for new kitchen gear"
+      },
+      {
+        "id": "s1",
+        "name": "Nikhil Rao",
+        "role": "security guard",
+        "persona": "calm, observant",
+        "public_alibi": "on patrol at checkpoint from 3:30 to 4:00 pm",
+        "speaking_style": "straightforward",
+        "innocent_secret": "meeting a supplier for a new security part"
+      },
+      {
+        "id": "s2",
+        "name": "Dev Jalan",
+        "role": "manager",
+        "persona": "assertive, meticulous",
+        "public_alibi": "reviewing match footage at 3:44 pm",
+        "speaking_style": "concise",
+        "innocent_secret": "discussing promotion plans with a rival"
+      }
+    ],
+    "timeline": [
+      "3:30 pm guard patrol",
+      "3:42 pm guard entered locker B",
+      "3:44 pm trophy swapped",
+      "3:45 pm guard exited",
+      "4:00 pm guard returned to checkpoint",
+      "4:10 pm manager noted missing trophy"
+    ],
+    "alibi_hole": "CCTV shows guard entering locker B at 3:42 pm",
+    "crime_verb": "swapped the trophy for a fake",
+    "culprit_id": "s1",
+    "ending_caught": "The detective matched the fingerprint, the video shadow, and the note; Nikhil’s badge was found abandoned. His false claim crumbled, and he was arrested.",
+    "ending_escaped": "If he’d slipped past the badge, he could have walked away with the fake trophy. The slip was his left badge on the bench.",
+    "culprit_objective": "Convince everyone the trophy had been damaged in transit"
+  },
+  {
+    "clues": [
+      {
+        "id": "c1",
+        "text": "Guard saw chef enter the back kitchen with the book",
+        "held_by": "s1",
+        "points_to": "s4",
+        "is_red_herring": false
+      },
+      {
+        "id": "c2",
+        "text": "Manager saw chef near the recipe shelf at 9:48",
+        "held_by": "s2",
+        "points_to": "s4",
+        "is_red_herring": false
+      },
+      {
+        "id": "c3",
+        "text": "Cleaner found the book on the prep table, missing the original",
+        "held_by": "s3",
+        "points_to": "s4",
+        "is_red_herring": false
+      },
+      {
+        "id": "c4",
+        "text": "Manager claims guard left the kitchen at 9:30",
+        "held_by": "s2",
+        "points_to": "s1",
+        "is_red_herring": true
+      },
+      {
+        "id": "c5",
+        "text": "Guard says cleaner was out of the kitchen",
+        "held_by": "s1",
+        "points_to": "s3",
+        "is_red_herring": true
+      }
+    ],
+    "crime": "stolen secret recipe book",
+    "facts": {
+      "what": "recipe book stolen",
+      "when": "9:45-10:00 pm",
+      "where": "back kitchen"
+    },
+    "intro": "When the city’s top critic arrived, the kitchen buzzed with whispers of a secret dish. Behind the clatter, a priceless book vanished in the dark.",
+    "roast": "Chef Nikhil, who thinks a recipe is treasure, turned his own kitchen into a vault.",
+    "title": "The Midnight Recipe Heist",
+    "method": "Used a disguised recipe book to swap with a fake",
+    "motive": "Own the recipe, profit from exclusive sale",
+    "setting": "A famous restaurant on a critic’s night",
+    "suspects": [
+      {
+        "id": "s1",
+        "name": "Yash Sinha",
+        "role": "Security Guard",
+        "persona": "stoic, precise",
+        "public_alibi": "On patrol, checked the cameras.",
+        "speaking_style": "dry, factual",
+        "innocent_secret": "Late shift coffee break."
+      },
+      {
+        "id": "s3",
+        "name": "Vikram Bose",
+        "role": "Cleaner",
+        "persona": "quiet, observant",
+        "public_alibi": "Cleaning the service area.",
+        "speaking_style": "low‑key, blunt",
+        "innocent_secret": "Hidden debt to a loan shark."
+      },
+      {
+        "id": "s4",
+        "name": "Nikhil Agarwal",
+        "role": "Chef",
+        "persona": "creative, passionate",
+        "public_alibi": "Preparing the critic’s signature dish.",
+        "speaking_style": "boastful, dramatic",
+        "innocent_secret": "Claimed he was on a break cleaning the pantry."
+      },
+      {
+        "id": "s2",
+        "name": "Sanjana Kapoor",
+        "role": "Restaurant Manager",
+        "persona": "energetic, organized",
+        "public_alibi": "Overseeing the critic’s table.",
+        "speaking_style": "friendly, reassuring",
+        "innocent_secret": "Had a meeting with a rival chef."
+      }
+    ],
+    "timeline": [
+      "09:30 09:30",
+      "09:45 09:45",
+      "09:50 09:50",
+      "09:55 09:55",
+      "10:00 10:00"
+    ],
+    "alibi_hole": "Security log shows chef in kitchen 09:47-09:53",
+    "crime_verb": "stole the recipe codex",
+    "culprit_id": "s4",
+    "ending_caught": "The chef slipped the fake book into the real one during prep. The guard’s footage finally showed him in the back kitchen, and the manager’s phone call at 10:00 confirmed it. The evidence was too clean, too timed. The chef was caught, apron on, a guilty smile on his face.",
+    "ending_escaped": "He slipped away during the rush, his head bowed to the critics’ applause. The book vanished into his pocket, the critic’s mystery solved, the chef’s secret recipe now a legend.",
+    "culprit_objective": "Convince everyone the kitchen lights were off at 9:48"
   }
 ];

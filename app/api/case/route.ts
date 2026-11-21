@@ -6,8 +6,8 @@ import type { Tone } from "@/lib/types";
 
 export const maxDuration = 40;
 
-const BANK_READY = 8; // below this, always write live so the bank grows
-const SERVE_FROM_BANK = 0.8;
+const BANK_READY = 6; // below this, always write live so the bank grows
+const SERVE_FROM_BANK = 0.9;
 
 export async function POST(req: Request) {
   return handle(async () => {
