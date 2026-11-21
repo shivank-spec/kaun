@@ -140,6 +140,13 @@ export interface RoomSettings {
   difficulty?: Difficulty;
   /** Set while the host has paused the round: milliseconds left in the frozen phase. */
   pausedMs?: number | null;
+  /** Secret-power effects this round. Server-side only: never sent to a browser as-is. */
+  fx?: {
+    planted: { id: string; text: string; byId: string; targetId: string; at: string }[];
+    blackoutUntil?: string | null;
+    blackoutBy?: string | null;
+    detectors: string[]; // players who used their lie detector
+  } | null;
 }
 
 export interface PlayerCard {
@@ -147,11 +154,15 @@ export interface PlayerCard {
   mission: string; // ONE line, e.g. "YOU ARE INNOCENT. Find who stole the rosogolla."
   clues: string[]; // exactly 2
   objective?: string; // culprit only
+  /** Secret powers still unused this round. Culprit: plant + blackout. Innocent: detector. */
+  powers?: { plant?: boolean; blackout?: boolean; detector?: boolean };
   job?: string; // who you are in this case, e.g. "Head of security"
   story?: string; // where you say you were: your answer when anyone asks
 }
 
 export interface RoomReveal {
+  /** The secret powers that were used, told at the end. */
+  tricks?: string[];
   culpritId: string;
   culpritName: string;
   accusedId: string | null; // who the group voted out
@@ -205,7 +216,9 @@ export interface RoomView {
    * Evidence from the AI bots. Bots cannot talk, so what they saw is dropped
    * into the room one piece at a time during the discussion.
    */
-  botClues?: { from: string; text: string }[];
+  botClues?: { id?: string; from: string; text: string }[];
   /** How many pieces of bot evidence exist in total this round. */
   evidenceTotal?: number;
+  /** Someone cut the lights: every phone goes dark until this time. */
+  blackoutUntil?: string | null;
 }

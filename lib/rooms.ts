@@ -58,7 +58,7 @@ function cleanSettings(raw: Partial<RoomSettings> | undefined, base?: RoomSettin
     raw?.difficulty === "easy" || raw?.difficulty === "hard" || raw?.difficulty === "medium"
       ? raw.difficulty
       : (base?.difficulty ?? "medium");
-  return { tone, setting, demo: raw?.demo ?? base?.demo ?? false, difficulty, pausedMs: null };
+  return { tone, setting, demo: raw?.demo ?? base?.demo ?? false, difficulty, pausedMs: null, fx: null };
 }
 
 /* ---------------- create / join ---------------- */
@@ -132,6 +132,7 @@ function buildCard(file: CaseFile, playerId: string): PlayerCard {
       objective: file.culprit_objective,
       job: me.role,
       story: me.public_alibi,
+      powers: { plant: true, blackout: true },
     };
   }
   return {
@@ -140,6 +141,7 @@ function buildCard(file: CaseFile, playerId: string): PlayerCard {
     clues,
     job: me.role,
     story: me.public_alibi,
+    powers: { detector: true },
   };
 }
 
@@ -223,8 +225,12 @@ export async function startRoom(
 const narrationOf = (file: CaseFile, caught: boolean) =>
   `${caught ? file.ending_caught : file.ending_escaped} ${file.roast}`;
 
-function buildReveal(file: CaseFile, players: PlayerRow[]): RoomReveal {
+function buildReveal(file: CaseFile, players: PlayerRow[], fx?: RoomSettings["fx"]): RoomReveal {
   const nameOf = (id: string | null) => players.find((p) => p.id === id)?.name ?? "nobody";
+  const tricks: string[] = [];
+  for (const p of fx?.planted ?? []) tricks.push(`${nameOf(p.byId)} planted fake evidence against ${nameOf(p.targetId)}`);
+  if (fx?.blackoutBy) tricks.push(`${nameOf(fx.blackoutBy)} cut the lights`);
+  for (const id of fx?.detectors ?? []) tricks.push(`${nameOf(id)} used a lie detector`);
   const tally = new Map<string, number>();
   for (const p of players) if (p.vote) tally.set(p.vote, (tally.get(p.vote) ?? 0) + 1);
   const ranked = [...tally.entries()].sort((a, b) => b[1] - a[1]);
@@ -234,6 +240,7 @@ function buildReveal(file: CaseFile, players: PlayerRow[]): RoomReveal {
   const framed = accusedId && !caught ? `${nameOf(accusedId)} was innocent. ` : "";
   const noVerdict = !accusedId ? "The group could not agree, so nobody was arrested. " : "";
   return {
+    tricks,
     culpritId: file.culprit_id,
     culpritName: nameOf(file.culprit_id),
     accusedId,
@@ -320,6 +327,69 @@ Return ONLY JSON: {"reply": string}`,
     // fall through to a line built from the case facts
   }
   return { reply: saw ? `${who.public_alibi}. But I will tell you this: ${(who.private_clues ?? [])[0]}` : `${who.public_alibi}. That is all I know.` };
+}
+
+const BLACKOUT_SECONDS = 10;
+const PLANT_LINES = [
+  (n: string, where: string) => `An anonymous tip: ${n} was seen slipping out of ${where} just before it was discovered.`,
+  (n: string) => `A note pushed under the door: "Ask ${n} where they really were. They are not telling you everything."`,
+  (n: string) => `Found in the bin: a torn page with ${n}'s handwriting, listing the exact time it happened.`,
+  (n: string) => `A cleaner swears ${n} asked them to "forget" what they saw that night.`,
+];
+
+/**
+ * Secret powers. The culprit can plant fake evidence or cut the lights; each
+ * innocent gets one lie detector. Every check happens here on the server, so a
+ * phone cannot grant itself a power or learn who used one.
+ */
+export async function playPower(
+  codeRaw: string,
+  playerId: string,
+  power: string,
+  opts: { targetId?: string; evidenceId?: string },
+) {
+  const code = codeRaw.toUpperCase();
+  const db = store();
+  const room = await db.getRoom(code);
+  if (!room) throw new GameError("No room with that code", 404);
+  if (room.status !== "discuss" || !room.case_file) throw new GameError("Powers only work during the discussion");
+  const players = await db.listPlayers(code);
+  const me = players.find((p) => p.id === playerId);
+  if (!me?.card) throw new GameError("You are not in this round", 403);
+  const fx = room.settings.fx ?? { planted: [], detectors: [] };
+  const powers = me.card.powers ?? {};
+  const spend = (key: "plant" | "blackout" | "detector") =>
+    db.updatePlayer(me.id, { card: { ...me.card!, powers: { ...powers, [key]: false } } });
+  const saveFx = (next: NonNullable<RoomSettings["fx"]>) =>
+    db.updateRoomIf(code, "discuss", { settings: { ...room.settings, fx: next } });
+
+  if (power === "plant") {
+    if (me.card.role !== "culprit" || !powers.plant) throw new GameError("You cannot do that");
+    const target = players.find((p) => p.id === opts.targetId && p.id !== me.id);
+    if (!target) throw new GameError("Pick someone to frame");
+    const where = room.case_file.facts?.where ?? "the room";
+    const line = PLANT_LINES[crypto.randomInt(PLANT_LINES.length)](target.name.split(" ")[0], where.replace(/\.$/, ""));
+    await saveFx({ ...fx, planted: [...fx.planted, { id: crypto.randomUUID(), text: line, byId: me.id, targetId: target.id, at: new Date().toISOString() }] });
+    await spend("plant");
+    return { ok: true };
+  }
+
+  if (power === "blackout") {
+    if (me.card.role !== "culprit" || !powers.blackout) throw new GameError("You cannot do that");
+    await saveFx({ ...fx, blackoutUntil: inSeconds(BLACKOUT_SECONDS), blackoutBy: me.id });
+    await spend("blackout");
+    return { ok: true };
+  }
+
+  if (power === "detector") {
+    if (me.card.role !== "innocent" || !powers.detector) throw new GameError("You have already used it");
+    const fake = fx.planted.some((p) => p.id === opts.evidenceId);
+    await saveFx({ ...fx, detectors: [...fx.detectors, me.id] });
+    await spend("detector");
+    return { ok: true, real: !fake };
+  }
+
+  throw new GameError("Unknown power");
 }
 
 /** The host can freeze the clock at any time, and start it again. */
@@ -442,7 +512,7 @@ async function advance(room: RoomRow, players: PlayerRow[]): Promise<RoomRow> {
   ) {
     next = {
       expected: "vote",
-      patch: { status: "reveal", phase_ends_at: null, reveal: buildReveal(room.case_file, players) },
+      patch: { status: "reveal", phase_ends_at: null, reveal: buildReveal(room.case_file, players, room.settings.fx) },
     };
   }
   if (!next) return room;
@@ -521,6 +591,13 @@ export async function getRoomView(codeRaw: string, playerId: string | null): Pro
   } else if (room.status === "vote" || room.status === "reveal") {
     dropped = evidence.length;
   }
+  // Planted evidence looks exactly like the real thing, and lands when it was planted.
+  const fxNow = room.settings.fx ?? null;
+  const planted = room.status === "lobby" || room.status === "generating" ? [] : (fxNow?.planted ?? []);
+  const feed = [
+    ...evidence.slice(0, dropped).map((e, i) => ({ id: `e${i}`, ...e })),
+    ...planted.map((p) => ({ id: p.id, from: "an anonymous tip", text: p.text })),
+  ];
   const doubtOf = (id: string) => {
     const voters = humans.filter((p) => p.id !== id);
     if (!voters.length) return 0;
@@ -537,7 +614,8 @@ export async function getRoomView(codeRaw: string, playerId: string | null): Pro
       room.status === "briefing" || room.status === "discuss" || room.status === "vote"
         ? timings(room.settings)[room.status]
         : undefined,
-    settings: room.settings,
+    // Never send the secret-power log: it says who planted what.
+    settings: { ...room.settings, fx: undefined },
     players: players.map((p) => ({
       id: p.id,
       name: p.name,
@@ -566,7 +644,11 @@ export async function getRoomView(codeRaw: string, playerId: string | null): Pro
     case: f && showCard ? { title: f.title, crime: f.crime, intro: f.intro, setting: f.setting, facts: f.facts } : null,
     reveal: room.status === "reveal" ? room.reveal : null,
     hotSeat: hotSeatNow(room, players),
-    botClues: evidence.slice(0, dropped),
-    evidenceTotal: evidence.length,
+    botClues: feed,
+    evidenceTotal: evidence.length + planted.length,
+    blackoutUntil:
+      room.status === "discuss" && fxNow?.blackoutUntil && Date.parse(fxNow.blackoutUntil) > Date.now()
+        ? fxNow.blackoutUntil
+        : null,
   };
 }

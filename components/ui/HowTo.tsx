@@ -10,7 +10,7 @@ const STEPS = {
   ],
   party: [
     ["Read the case and your card", "Everyone sees the case. Then you get a secret card: who you are, your story, and what you saw."],
-    ["Question each other", "Tell people what you saw. Ask where they were. One of you is the culprit and is lying."],
+    ["Question, accuse, play dirty", "Say what you saw and ask where people were. Everyone has a secret power: the culprit can plant fake evidence and cut the lights, the rest have a lie detector."],
     ["Vote", "Tap who you think did it and lock it in. If most of you pick the culprit, you win. If not, the culprit wins."],
   ],
 } as const;

@@ -46,6 +46,10 @@ function Room({ code }: { code: string }) {
       doubt: (targetId) => run("doubt", { targetId }),
       skip: () => run("skip", {}),
       pause: () => run("pause", {}),
+      power: (power, opts) => post<{ real?: boolean }>(`${base}/power`, { playerId, power, ...opts }).then((r) => {
+        refresh();
+        return r;
+      }),
       ask: (targetId, question) =>
         post<{ reply?: string; delivered?: boolean }>(`${base}/ask`, { playerId, targetId, question }),
       home: () => {

@@ -19,6 +19,7 @@ export interface RoomActions {
   skip: () => Promise<void>;
   pause: () => Promise<void>;
   ask: (targetId: string, question: string) => Promise<{ reply?: string; delivered?: boolean }>;
+  power: (power: "plant" | "blackout" | "detector", opts?: { targetId?: string; evidenceId?: string }) => Promise<{ real?: boolean }>;
   home: () => void;
 }
 
@@ -299,6 +300,11 @@ function RoleCard({ card, compact = false }: { card: PlayerCard; compact?: boole
           <Line key={i} k={culprit ? "Use this to blame someone" : "What you saw · tell the room"} v={c} color={color} />
         ))}
         {card.objective && <Line k="The lie you need them to believe" v={card.objective} color="#ff8098" />}
+        {card.role === "culprit" ? (
+          <Line k="Your secret powers · once each" v="Plant fake evidence against someone. Cut the lights for 10 seconds." color="#ff8098" />
+        ) : (
+          <Line k="Your secret power · once" v="Lie detector: test one piece of evidence to see if it was planted." color={color} />
+        )}
       </div>
     </div>
   );
@@ -491,6 +497,40 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
   const [open, setOpen] = useState<string | null>(null); // "case" | "role" | "evidence" | player id
   const [fresh, setFresh] = useState(0); // evidence the player has not opened yet
   const [asksLeft, setAsksLeft] = useState(3);
+  const [tested, setTested] = useState<Record<string, boolean>>({}); // evidence id -> real?
+  const [powerBusy, setPowerBusy] = useState(false);
+  const powers = card?.powers ?? {};
+  const dark = room.blackoutUntil ? Math.max(0, Math.ceil((Date.parse(room.blackoutUntil) - Date.parse(room.serverNow)) / 1000)) : 0;
+  const wasDark = useRef(false);
+
+  useEffect(() => {
+    if (dark > 0 && !wasDark.current) {
+      wasDark.current = true;
+      setOpen(null);
+      sfx.sting();
+    }
+    if (dark === 0) wasDark.current = false;
+  }, [dark]);
+
+  async function power(kind: "plant" | "blackout" | "detector", opts: { targetId?: string; evidenceId?: string } = {}) {
+    if (powerBusy) return;
+    setPowerBusy(true);
+    try {
+      const r = await actions.power(kind, opts);
+      if (kind === "detector" && opts.evidenceId) {
+        setTested((t) => ({ ...t, [opts.evidenceId!]: r.real !== false }));
+        if (r.real === false) sfx.crack();
+        else sfx.clue();
+      } else {
+        sfx.crack();
+        setOpen(null);
+      }
+    } catch {
+      // the server refused (already used, or the phase moved on)
+    } finally {
+      setPowerBusy(false);
+    }
+  }
   const [asking, setAsking] = useState(false);
   const [talk, setTalk] = useState<Record<string, { q: string; a: string }[]>>({});
   const poke = you?.poke ?? null;
@@ -564,7 +604,7 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
       </div>
 
       <div className="mt-3 grid min-h-[260px] flex-1 auto-rows-fr grid-cols-2 gap-2.5">
-        <Tile title="The case" hint="What happened" accent="#5FDDF7" wide={(3 + others.length) % 2 === 1} onOpen={() => setOpen("case")}>
+        <Tile title="The case" hint="What happened" accent="#5FDDF7" wide={(3 + others.length + (powers.plant ? 1 : 0) + (powers.blackout ? 1 : 0) + (powers.detector ? 1 : 0)) % 2 === 1} onOpen={() => setOpen("case")}>
           <Glyph d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5" />
         </Tile>
         <Tile title="Your secret role" hint="Only you see this" accent={card?.role === "culprit" ? "#F0385A" : "#5FDDF7"} onOpen={() => setOpen("role")}>
@@ -582,6 +622,21 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
         >
           <Glyph d="M10.500 4a6.500 6.500 0 1 0 4.100 11.600l4.900 4.900 1.400-1.400-4.900-4.900A6.500 6.500 0 0 0 10.500 4zm0 2a4.500 4.500 0 1 1 0 9 4.500 4.500 0 0 1 0-9z" />
         </Tile>
+        {powers.plant && (
+          <Tile title="Plant evidence" hint="Secret power · frame someone" accent="#F0385A" onOpen={() => setOpen("plant")}>
+            <Glyph d="M12 3v10M7 8l5 5 5-5M5 19h14" />
+          </Tile>
+        )}
+        {powers.blackout && (
+          <Tile title="Cut the lights" hint="Secret power · 10 s blackout" accent="#F0385A" onOpen={() => setOpen("blackout")}>
+            <Glyph d="M13 2L5 14h6l-1 8 8-12h-6z" />
+          </Tile>
+        )}
+        {powers.detector && (
+          <Tile title="Lie detector" hint="Secret power · test evidence" accent="#5FDDF7" onOpen={() => { setFresh(0); setOpen("evidence"); }}>
+            <Glyph d="M3 12h4l2-6 4 12 2-6h6" />
+          </Tile>
+        )}
         {others.map((p) => {
           const i = indexOf(room, p.id);
           return (
@@ -635,6 +690,18 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
                     <div key={i} className="rounded-[12px] bg-black/30 px-3.5 py-2.5">
                       <p className="m-0 text-[15px] leading-snug">{e.text}</p>
                       <p className="label m-0 mt-1">Reported by {e.from}</p>
+                      {e.id && tested[e.id] !== undefined ? (
+                        <p className="label m-0 mt-1.5" style={{ color: tested[e.id] ? "#B6F36A" : "#F0385A" }}>
+                          {tested[e.id] ? "Lie detector: this is real" : "Lie detector: FAKE. Someone planted this."}
+                        </p>
+                      ) : (
+                        powers.detector &&
+                        e.id && (
+                          <button type="button" className="chip tap mt-2 !min-h-10 !text-[13px]" disabled={powerBusy} onClick={() => power("detector", { evidenceId: e.id })}>
+                            Use lie detector on this
+                          </button>
+                        )
+                      )}
                     </div>
                   ))}
                 </div>
@@ -663,6 +730,34 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
                     </div>
                   </>
                 )}
+              </div>
+            )}
+            {open === "plant" && (
+              <div className="panel p-5">
+                <p className="eyebrow m-0" style={{ color: "#ff8098" }}>Secret power</p>
+                <p className="display m-0 mt-1 text-[24px]">Frame someone</p>
+                <p className="m-0 mt-1 text-[14px] leading-snug text-mist">
+                  A fake tip against them appears in everyone&apos;s evidence. Nobody will know it was you. One use.
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {others.map((p) => (
+                    <button key={p.id} type="button" className="chip tap !min-h-12" disabled={powerBusy} onClick={() => power("plant", { targetId: p.id })}>
+                      {label(room, p.name)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {open === "blackout" && (
+              <div className="panel p-5 text-center">
+                <p className="eyebrow m-0" style={{ color: "#ff8098" }}>Secret power</p>
+                <p className="display m-0 mt-1 text-[24px]">Cut the lights</p>
+                <p className="m-0 mt-1 text-[14px] leading-snug text-mist">
+                  Every phone goes dark for 10 seconds, yours too. Use it when they are getting close. One use.
+                </p>
+                <button type="button" className="btn btn-danger tap mt-4" disabled={powerBusy} onClick={() => power("blackout")}>
+                  Cut the lights now
+                </button>
               </div>
             )}
             {opened && (
@@ -717,6 +812,17 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
             <button type="button" className="btn btn-primary tap" onClick={() => setOpen(null)}>
               Close card
             </button>
+          </div>
+        </div>
+      )}
+
+      {dark > 0 && (
+        <div className="scrim !justify-center px-6" role="alert" style={{ zIndex: 55, background: "#000" }}>
+          <div className="text-center">
+            <p className="eyebrow blink m-0" style={{ color: "#F0385A" }}>Blackout</p>
+            <p className="display m-0 mt-3 text-[clamp(34px,11vw,48px)]">Someone cut the lights</p>
+            <p className="mono m-0 mt-4 text-[40px] text-[#F0385A]">{dark}</p>
+            <p className="label mt-3">Who just did that? Look at their faces.</p>
           </div>
         </div>
       )}
@@ -952,6 +1058,14 @@ export function Verdict({ room, actions }: Props) {
         </span>
       </div>
 
+      {(r.tricks?.length ?? 0) > 0 && (
+        <div className="mt-4 rounded-[12px] px-3.5 py-2.5" style={{ background: "rgba(240,56,90,.12)", boxShadow: "inset 0 0 0 1px rgba(240,56,90,.45)" }}>
+          <p className="label m-0 text-[#ff8098]">Dirty tricks this round</p>
+          {r.tricks!.map((t, i) => (
+            <p key={i} className="m-0 mt-1 text-[14.5px] font-medium leading-snug">{t}</p>
+          ))}
+        </div>
+      )}
       <p className="label mt-4 text-snow">How the room voted</p>
       <div className="mt-1.5 flex shrink-0 flex-col gap-1.5">
         {tally.map(({ p, i, n }) => (
