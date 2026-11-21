@@ -38,7 +38,8 @@ function timings(settings: RoomSettings) {
   return { ...SECONDS.normal, discuss: DISCUSS_BY_LEVEL[settings.difficulty ?? "medium"] };
 }
 const MIN_HUMANS = 2; // with 2 humans an AI bot fills the third seat
-const MIN_SEATS = 5; // a room always has at least five suspects
+const MIN_SEATS = 6; // a room always has at least six suspects
+const MAX_BOTS = 4;
 const BOT_NAMES = ["Asha", "Vikram", "Meera", "Kabir", "Zoya"];
 const MAX_PLAYERS = 8;
 const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O
@@ -121,7 +122,38 @@ export async function joinRoom(codeRaw: string, name: unknown) {
 
 /* ---------------- start ---------------- */
 
-function buildCard(file: CaseFile, playerId: string): PlayerCard {
+const keepCase = (from: string, to: string) => (/^[A-Z]/.test(from) ? to[0].toUpperCase() + to.slice(1) : to);
+const BE: Record<string, string> = { was: "were", is: "are", has: "have", does: "do", "wasn't": "weren't", "isn't": "aren't", "hasn't": "haven't", "doesn't": "don't" };
+
+/** Rewrite he/she wording as they/their, so a story never mismatches a player's name. */
+export function neutralText(text: string): string {
+  return text
+    .replace(/\b(he|she)\s+(was|is|has|does|wasn't|isn't|hasn't|doesn't)\b/gi, (m, _p, v: string) => `${keepCase(m, "they")} ${BE[v.toLowerCase()]}`)
+    .replace(/\b(he|she)'s\b/gi, (m) => keepCase(m, "they're"))
+    .replace(/\b(he|she)\b/gi, (m) => keepCase(m, "they"))
+    .replace(/\b(himself|herself)\b/gi, (m) => keepCase(m, "themselves"))
+    .replace(/\bhers\b/gi, (m) => keepCase(m, "theirs"))
+    .replace(/\bhim\b/gi, (m) => keepCase(m, "them"))
+    .replace(/\bhis\b/gi, (m) => keepCase(m, "their"))
+    // "her" is "them" before a pause or a small joining word, otherwise "their".
+    .replace(/\bher\b(?=\s*([.,;:!?)"”]|$|\s(?:and|or|but|to|at|in|on|with|for|from|when|as|that|about|of|by|after|before|if|while|so)\b))/gi, (m) => keepCase(m, "them"))
+    .replace(/\bher\b/gi, (m) => keepCase(m, "their"));
+}
+
+function neutralCase<T>(value: T): T {
+  if (typeof value === "string") return neutralText(value) as T;
+  if (Array.isArray(value)) return value.map(neutralCase) as T;
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, /id$/i.test(k) || k === "held_by" || k === "points_to" ? v : neutralCase(v)])) as T;
+  }
+  return value;
+}
+
+
+const INNOCENT_POWERS = ["detector", "clear", "extra"] as const;
+type InnocentPower = (typeof INNOCENT_POWERS)[number];
+
+function buildCard(file: CaseFile, playerId: string, power: InnocentPower = "detector"): PlayerCard {
   const me = file.suspects.find((s) => s.id === playerId)!;
   const clues = (me.private_clues ?? []).slice(0, 2);
   if (playerId === file.culprit_id) {
@@ -141,7 +173,7 @@ function buildCard(file: CaseFile, playerId: string): PlayerCard {
     clues,
     job: me.role,
     story: me.public_alibi,
-    powers: { detector: true },
+    powers: { [power]: true },
   };
 }
 
@@ -174,7 +206,7 @@ export async function startRoom(
     // Fill empty seats with AI bots so two people can still play a full room.
     const taken = new Set(players.map((p) => p.name.toLowerCase().split(" ")[0]));
     const botNames = BOT_NAMES.filter((n) => !taken.has(n.toLowerCase()));
-    for (let i = 0; players.length < MIN_SEATS; i++) {
+    for (let i = 0; players.length < MIN_SEATS && players.filter((p) => p.is_bot).length < MAX_BOTS; i++) {
       const bot: PlayerRow = {
         id: crypto.randomUUID(),
         room_code: code,
@@ -206,8 +238,13 @@ export async function startRoom(
       const banked = await drawCase(/hackathon/i.test(merged.setting) ? "hackathon" : "kolkata", merged.tone, []).catch(() => null);
       if (banked) file = recastForPlayers(banked.file, cast, humanIds);
     }
+    // The story may have been written for someone else, so nobody is a he or a she.
+    file = neutralCase(file);
+    // Deal the innocent powers round the table, so friends hold different ones each round.
+    const deal = [...INNOCENT_POWERS].sort(() => Math.random() - 0.5);
+    const spin = crypto.randomInt(deal.length);
     await Promise.all(
-      players.map((p) => db.updatePlayer(p.id, { card: buildCard(file, p.id), vote: null, doubt: null })),
+      players.map((p, i) => db.updatePlayer(p.id, { card: buildCard(file, p.id, deal[(i + spin) % deal.length]), vote: null, doubt: null })),
     );
     const t = timings(merged);
     await db.updateRoomIf(code, "generating", {
@@ -234,6 +271,7 @@ function buildReveal(file: CaseFile, players: PlayerRow[], fx?: RoomSettings["fx
   for (const p of fx?.planted ?? []) tricks.push(`${nameOf(p.byId)} planted fake evidence against ${nameOf(p.targetId)}`);
   if (fx?.blackoutBy) tricks.push(`${nameOf(fx.blackoutBy)} cut the lights`);
   for (const id of fx?.detectors ?? []) tricks.push(`${nameOf(id)} used a lie detector`);
+  for (const note of fx?.notes ?? []) tricks.push(note);
   const tally = new Map<string, number>();
   for (const p of players) if (p.vote) tally.set(p.vote, (tally.get(p.vote) ?? 0) + 1);
   const ranked = [...tally.entries()].sort((a, b) => b[1] - a[1]);
@@ -280,7 +318,7 @@ export async function castVote(codeRaw: string, playerId: string, targetId: stri
   return { ok: true };
 }
 
-const POKE_SECONDS = 14;
+const POKE_SECONDS = 60;
 
 /**
  * Ask a suspect a question during the discussion.
@@ -372,7 +410,7 @@ export async function playPower(
   if (!me?.card) throw new GameError("You are not in this round", 403);
   const fx = room.settings.fx ?? { planted: [], detectors: [] };
   const powers = me.card.powers ?? {};
-  const spend = (key: "plant" | "blackout" | "detector") =>
+  const spend = (key: "plant" | "blackout" | "detector" | "clear" | "extra") =>
     db.updatePlayer(me.id, { card: { ...me.card!, powers: { ...powers, [key]: false } } });
   const saveFx = (next: NonNullable<RoomSettings["fx"]>) =>
     db.updateRoomIf(code, "discuss", { settings: { ...room.settings, fx: next } });
@@ -401,6 +439,24 @@ export async function playPower(
     await saveFx({ ...fx, detectors: [...fx.detectors, me.id] });
     await spend("detector");
     return { ok: true, real: !fake };
+  }
+
+  if (power === "clear") {
+    if (me.card.role !== "innocent" || !powers.clear) throw new GameError("You have already used it");
+    // Name one suspect who certainly did not do it.
+    const safe = players.filter((p) => p.id !== me.id && p.id !== room.case_file!.culprit_id);
+    if (!safe.length) throw new GameError("Nobody to check");
+    const pick = safe[crypto.randomInt(safe.length)];
+    await saveFx({ ...fx, notes: [...(fx.notes ?? []), `${me.name} ran a background check`] });
+    await spend("clear");
+    return { ok: true, clearedName: pick.name };
+  }
+
+  if (power === "extra") {
+    if (me.card.role !== "innocent" || !powers.extra) throw new GameError("You have already used it");
+    await saveFx({ ...fx, notes: [...(fx.notes ?? []), `${me.name} took extra questions`] });
+    await spend("extra");
+    return { ok: true, extra: 3 };
   }
 
   throw new GameError("Unknown power");

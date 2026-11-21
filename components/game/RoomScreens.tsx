@@ -19,12 +19,13 @@ export interface RoomActions {
   skip: () => Promise<void>;
   pause: () => Promise<void>;
   ask: (targetId: string, question: string) => Promise<{ reply?: string; delivered?: boolean }>;
-  power: (power: "plant" | "blackout" | "detector", opts?: { targetId?: string; evidenceId?: string }) => Promise<{ real?: boolean }>;
+  power: (power: PowerKind, opts?: { targetId?: string; evidenceId?: string }) => Promise<{ real?: boolean; clearedName?: string; extra?: number }>;
   home: () => void;
 }
 
 type Props = { room: RoomView; actions: RoomActions; secondsLeft: number | null };
 
+type PowerKind = "plant" | "blackout" | "detector" | "clear" | "extra";
 const indexOf = (room: RoomView, id: string) => Math.max(0, room.players.findIndex((p) => p.id === id));
 const first = (name: string) => name.split(" ")[0];
 /** First name, unless two players share it: then the full name, so nobody is confused. */
@@ -116,6 +117,7 @@ export function Lobby({ room, actions }: Props) {
   const [copied, setCopied] = useState(false);
   const url = typeof window === "undefined" ? "" : `${window.location.origin}/room/${room.code}`;
   const humans = room.players.filter((p) => !p.isBot);
+  const aiSeats = Math.min(4, Math.max(0, 6 - humans.length));
   const enough = humans.length >= 2;
   const hostName = room.players.find((p) => p.isHost)?.name ?? "the host";
 
@@ -177,7 +179,7 @@ export function Lobby({ room, actions }: Props) {
       </div>
 
       <p className="eyebrow mt-4 text-center">
-        {humans.length} {humans.length === 1 ? "player" : "players"} · {Math.max(0, 5 - humans.length)} AI {5 - humans.length === 1 ? "suspect" : "suspects"}
+        {humans.length} {humans.length === 1 ? "player" : "players"} · {aiSeats} AI {aiSeats === 1 ? "suspect" : "suspects"}
       </p>
       <div className="mt-2 grid flex-1 grid-cols-2 content-start gap-2.5">
         {room.players.map((p, i) => (
@@ -193,8 +195,8 @@ export function Lobby({ room, actions }: Props) {
             </span>
           </div>
         ))}
-        {/* Empty seats are filled by AI suspects, so a room always has five. */}
-        {["Asha", "Vikram", "Meera", "Kabir"].slice(0, Math.max(0, 5 - humans.length)).map((name, k) => (
+        {/* Empty seats are filled by AI suspects, so a room always has six. */}
+        {["Asha", "Vikram", "Meera", "Kabir"].slice(0, aiSeats).map((name, k) => (
           <div key={name} className="panel flex items-center gap-2.5 p-2.5" style={{ opacity: 0.82 }}>
             <Avatar name={name} index={humans.length + k} size={40} />
             <span className="min-w-0">
@@ -225,7 +227,7 @@ export function Lobby({ room, actions }: Props) {
       )}
 
       <p className="label mb-2.5 mt-3 text-center text-snow">
-        {error ? error : !enough ? "Need at least 2 players" : humans.length < 5 ? `${5 - humans.length} AI ${5 - humans.length === 1 ? "suspect joins" : "suspects join"} to make five` : "Everyone is ready"}
+        {error ? error : !enough ? "Need at least 2 players" : aiSeats > 0 ? `${aiSeats} AI ${aiSeats === 1 ? "suspect plays" : "suspects play"} with you` : "Everyone is ready"}
       </p>
       {host ? (
         <button type="button" className="btn btn-primary tap" disabled={!enough || busy} onClick={start}>
@@ -303,7 +305,17 @@ function RoleCard({ card, compact = false }: { card: PlayerCard; compact?: boole
         {card.role === "culprit" ? (
           <Line k="Your secret powers · once each" v="Plant fake evidence against someone. Cut the lights for 10 seconds." color="#ff8098" />
         ) : (
-          <Line k="Your secret power · once" v="Lie detector: test one piece of evidence to see if it was planted." color={color} />
+          <Line
+            k="Your secret power · once"
+            v={
+              card.powers?.clear
+                ? "Background check: confirm one suspect who is innocent."
+                : card.powers?.extra
+                  ? "Extra questions: ask three more questions."
+                  : "Lie detector: test one piece of evidence to see if it was planted."
+            }
+            color={color}
+          />
         )}
       </div>
     </div>
@@ -445,21 +457,19 @@ function Fact({ k, v }: { k: string; v: string }) {
 }
 
 /** A face-down card on the table. Tap to open it. */
-function Tile({
+function Tool({
   title,
-  hint,
   accent,
   badge,
-  wide,
-  children,
+  hot,
+  d,
   onOpen,
 }: {
   title: string;
-  hint: string;
   accent: string;
   badge?: string;
-  wide?: boolean;
-  children?: React.ReactNode;
+  hot?: boolean;
+  d: string;
   onOpen: () => void;
 }) {
   return (
@@ -469,20 +479,21 @@ function Tile({
         sfx.tap();
         onOpen();
       }}
-      className={`tap relative flex flex-col items-center justify-center gap-1.5 rounded-[16px] border-0 px-2 py-3 text-center text-snow ${wide ? "col-span-2" : ""}`}
+      className="tap relative flex h-[62px] flex-col items-center justify-center gap-1 rounded-[14px] border-0 px-1 text-snow"
       style={{
         background: "linear-gradient(180deg, rgba(28,40,66,.9), rgba(12,18,34,.94))",
-        boxShadow: `inset 0 0 0 1px rgba(130,180,230,.22), inset 0 3px 0 ${accent}`,
+        boxShadow: `inset 0 0 0 1px ${hot ? accent : "rgba(130,180,230,.22)"}`,
       }}
     >
       {badge && (
-        <span className="mono absolute right-2 top-2 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-ink" style={{ background: accent }}>
+        <span className="mono absolute -right-1 -top-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-ink" style={{ background: accent }}>
           {badge}
         </span>
       )}
-      {children}
-      <span className="w-full truncate text-[15px] font-bold leading-tight">{title}</span>
-      <span className="label !text-[9px]">{hint}</span>
+      <span style={{ color: accent }}>
+        <Glyph d={d} />
+      </span>
+      <span className="text-[13px] font-semibold leading-none">{title}</span>
     </button>
   );
 }
@@ -500,6 +511,8 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
   const [tested, setTested] = useState<Record<string, boolean>>({}); // evidence id -> real?
   const [powerBusy, setPowerBusy] = useState(false);
   const powers = card?.powers ?? {};
+  const [cleared, setCleared] = useState<string | null>(null);
+  const powersLeft = Object.values(powers).filter(Boolean).length;
   const dark = room.blackoutUntil ? Math.max(0, Math.ceil((Date.parse(room.blackoutUntil) - Date.parse(room.serverNow)) / 1000)) : 0;
   const wasDark = useRef(false);
 
@@ -512,7 +525,7 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
     if (dark === 0) wasDark.current = false;
   }, [dark]);
 
-  async function power(kind: "plant" | "blackout" | "detector", opts: { targetId?: string; evidenceId?: string } = {}) {
+  async function power(kind: PowerKind, opts: { targetId?: string; evidenceId?: string } = {}) {
     if (powerBusy) return;
     setPowerBusy(true);
     try {
@@ -521,6 +534,13 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
         setTested((t) => ({ ...t, [opts.evidenceId!]: r.real !== false }));
         if (r.real === false) sfx.crack();
         else sfx.clue();
+      } else if (kind === "clear") {
+        setCleared(r.clearedName ?? null);
+        sfx.clue();
+      } else if (kind === "extra") {
+        setAsksLeft((n) => n + (r.extra ?? 3));
+        sfx.clue();
+        setOpen(null);
       } else {
         sfx.crack();
         setOpen(null);
@@ -536,6 +556,12 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
   const poke = you?.poke ?? null;
   const pokeLeft = poke ? Math.max(0, Math.ceil((Date.parse(poke.endsAt) - Date.parse(room.serverNow)) / 1000)) : 0;
   const lastPoke = useRef<string | null>(null);
+  // Each player closes a question on their own phone once it has been answered.
+  const [closed, setClosed] = useState<string[]>([]);
+  const pokeKey = poke ? `p:${poke.question}${poke.endsAt}` : "";
+  const hotKey = hot ? `h:${hot.question}` : "";
+  const showPoke = Boolean(poke) && !closed.includes(pokeKey);
+  const showHot = Boolean(hot) && !closed.includes(hotKey);
 
   useEffect(() => {
     if (poke && lastPoke.current !== poke.question + poke.endsAt) {
@@ -591,67 +617,72 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
         <Timer seconds={secondsLeft ?? 0} total={total} label="Discussion" sub="Talk it out loud" />
       </div>
       {card?.story && (
-        <div className="panel mt-3 px-3.5 py-2.5">
-          <p className="label m-0 text-cyan">You are the {card.job ?? "suspect"} · if anyone asks, say</p>
-          <p className="m-0 mt-0.5 text-[14.5px] leading-snug">“{card.story}”</p>
-        </div>
+        <p className="m-0 mt-3 truncate text-[14px] text-mist">
+          <span className="text-cyan">Your story:</span> “{card.story}”
+        </p>
       )}
-      <div className="mt-3 flex items-start justify-between gap-3">
-        <p className="m-0 text-[15px] leading-snug text-[#E3E8F2]">Anyone here could be guilty, even an AI suspect. Open one and question them.</p>
-        <span className="label shrink-0 rounded-full px-2.5 py-1.5 text-snow" style={{ boxShadow: "inset 0 0 0 1px rgba(95,221,247,.5)" }}>
-          {asksLeft} {asksLeft === 1 ? "question" : "questions"} left
-        </span>
+
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <p className="m-0 text-[17px] font-semibold text-snow">Tap a suspect to question them</p>
+        <span className="label shrink-0 text-cyan">{asksLeft} left</span>
       </div>
 
-      <div className="mt-3 grid min-h-[260px] flex-1 auto-rows-fr grid-cols-2 gap-2.5">
-        <Tile title="The case" hint="What happened" accent="#5FDDF7" wide={(3 + others.length + (powers.plant || powers.blackout ? 1 : 0) + (powers.detector ? 1 : 0)) % 2 === 1} onOpen={() => setOpen("case")}>
-          <Glyph d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5" />
-        </Tile>
-        <Tile title="Your secret role" hint="Only you see this" accent={card?.role === "culprit" ? "#F0385A" : "#5FDDF7"} onOpen={() => setOpen("role")}>
-          <Glyph d="M12 3a4 4 0 0 1 4 4v3h1.500v10h-11V10H8V7a4 4 0 0 1 4-4zM10 10h4V7a2 2 0 0 0-4 0z" />
-        </Tile>
-        <Tile
+      {/* The suspects: one clear row each. */}
+      <div className={`mt-2.5 grid min-h-0 flex-1 auto-rows-[minmax(60px,104px)] content-start gap-2 overflow-y-auto ${others.length > 5 ? "grid-cols-2" : "grid-cols-1"}`}>
+        {others.map((p) => {
+          const i = indexOf(room, p.id);
+          const doubted = you?.doubting === p.id;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => {
+                sfx.tap();
+                setOpen(p.id);
+              }}
+              className="tap flex h-full min-h-[60px] w-full items-center gap-3 rounded-[16px] border-0 px-3.5 py-2 text-left text-snow"
+              style={{
+                background: "linear-gradient(180deg, rgba(28,40,66,.9), rgba(12,18,34,.94))",
+                boxShadow: `inset 0 0 0 1px ${doubted ? "#F0385A" : "rgba(130,180,230,.22)"}`,
+              }}
+            >
+              <Avatar name={p.name} index={i} size={38} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[17px] font-semibold leading-tight">{label(room, p.name)}</span>
+                <span className="block truncate text-[13px] leading-tight text-mist">
+                  {doubted ? "You doubt them" : p.isBot ? "AI suspect" : "Player"}
+                  {(p.doubt ?? 0) > 0 ? ` · ${p.doubt}% doubt` : ""}
+                </span>
+              </span>
+              <span className="shrink-0 text-[14px] font-semibold text-cyan">Ask</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Everything else lives in one small bar. */}
+      <div className="mt-3 grid shrink-0 auto-cols-fr grid-flow-col gap-2">
+        <Tool title="Case" accent="#5FDDF7" onOpen={() => setOpen("case")} d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5" />
+        <Tool
+          title="My role"
+          accent={card?.role === "culprit" ? "#F0385A" : "#5FDDF7"}
+          onOpen={() => setOpen("role")}
+          d="M12 3a4 4 0 0 1 4 4v3h1.500v10h-11V10H8V7a4 4 0 0 1 4-4zM10 10h4V7a2 2 0 0 0-4 0z"
+        />
+        <Tool
           title="Evidence"
-          hint={`${evidence.length} of ${room.evidenceTotal ?? evidence.length} found`}
           accent="#B6F36A"
-          badge={fresh ? `${fresh} new` : undefined}
+          badge={fresh ? `${fresh} new` : String(evidence.length)}
+          hot={fresh > 0}
           onOpen={() => {
             setFresh(0);
             setOpen("evidence");
           }}
-        >
-          <Glyph d="M10.500 4a6.500 6.500 0 1 0 4.100 11.600l4.900 4.900 1.400-1.400-4.900-4.900A6.500 6.500 0 0 0 10.500 4zm0 2a4.500 4.500 0 1 1 0 9 4.500 4.500 0 0 1 0-9z" />
-        </Tile>
-        {(powers.plant || powers.blackout) && (
-          <Tile
-            title="Secret powers"
-            hint={`${(powers.plant ? 1 : 0) + (powers.blackout ? 1 : 0)} left · only you have these`}
-            accent="#F0385A"
-            onOpen={() => setOpen("powers")}
-          >
-            <Glyph d="M13 2L5 14h6l-1 8 8-12h-6z" />
-          </Tile>
+          d="M10.500 4a6.500 6.500 0 1 0 4.100 11.600l4.900 4.900 1.400-1.400-4.900-4.900A6.500 6.500 0 0 0 10.500 4zm0 2a4.500 4.500 0 1 1 0 9 4.500 4.500 0 0 1 0-9z"
+        />
+        {(powersLeft > 0 || cleared) && (
+          <Tool title="Power" accent={card?.role === "culprit" ? "#F0385A" : "#FFC857"} badge={powersLeft ? String(powersLeft) : undefined} onOpen={() => setOpen("powers")} d="M13 2L5 14h6l-1 8 8-12h-6z" />
         )}
-        {powers.detector && (
-          <Tile title="Lie detector" hint="Your secret power · 1 use" accent="#5FDDF7" onOpen={() => { setFresh(0); setOpen("evidence"); }}>
-            <Glyph d="M3 12h4l2-6 4 12 2-6h6" />
-          </Tile>
-        )}
-        {others.map((p) => {
-          const i = indexOf(room, p.id);
-          return (
-            <Tile
-              key={p.id}
-              title={label(room, p.name)}
-              hint={p.isBot ? `AI · doubt ${p.doubt ?? 0}%` : `Doubt ${p.doubt ?? 0}%`}
-              accent={you?.doubting === p.id ? "#F0385A" : ringOf(i)}
-              badge={you?.doubting === p.id ? "doubted" : undefined}
-              onOpen={() => setOpen(p.id)}
-            >
-              <Avatar name={p.name} index={i} size={38} />
-            </Tile>
-          );
-        })}
       </div>
 
       {you?.isHost ? (
@@ -664,7 +695,7 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
       )}
 
       {/* The opened flashcard. */}
-      {open && !hot && (
+      {open && !showHot && (showPoke ? false : true) && (
         <div className="scrim !justify-center px-5" role="dialog" aria-label="Card">
           <button type="button" aria-label="Close card" className="absolute inset-0 border-0 bg-transparent" onClick={() => setOpen(null)} />
           <div className="rise relative flex max-h-[82%] flex-col gap-3 overflow-y-auto">
@@ -734,7 +765,42 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
             )}
             {open === "powers" && (
               <div className="panel p-5">
-                <p className="eyebrow m-0" style={{ color: "#ff8098" }}>Secret powers · once each</p>
+                <p className="eyebrow m-0" style={{ color: card?.role === "culprit" ? "#ff8098" : "#FFC857" }}>
+                  {card?.role === "culprit" ? "Secret powers · once each" : "Your secret power · one use"}
+                </p>
+                {powers.detector && (
+                  <>
+                    <p className="display m-0 mt-2 text-[22px]">Lie detector</p>
+                    <p className="m-0 mt-1 text-[14px] leading-snug text-mist">Test one piece of evidence. You will learn if it is real or was planted by the culprit.</p>
+                    <button type="button" className="btn btn-primary tap mt-3 !min-h-12" onClick={() => { setFresh(0); setOpen("evidence"); }}>
+                      Open the evidence
+                    </button>
+                  </>
+                )}
+                {powers.clear && !cleared && (
+                  <>
+                    <p className="display m-0 mt-2 text-[22px]">Background check</p>
+                    <p className="m-0 mt-1 text-[14px] leading-snug text-mist">Find out one suspect who definitely did not do it. Only you will know.</p>
+                    <button type="button" className="btn btn-primary tap mt-3 !min-h-12" disabled={powerBusy} onClick={() => power("clear")}>
+                      Run the check
+                    </button>
+                  </>
+                )}
+                {cleared && (
+                  <>
+                    <p className="display m-0 mt-2 text-[22px]" style={{ color: "#B6F36A" }}>{label(room, cleared)} is innocent</p>
+                    <p className="m-0 mt-1 text-[14px] leading-snug text-mist">Confirmed by your background check. Cross them off your list.</p>
+                  </>
+                )}
+                {powers.extra && (
+                  <>
+                    <p className="display m-0 mt-2 text-[22px]">Extra questions</p>
+                    <p className="m-0 mt-1 text-[14px] leading-snug text-mist">Get three more questions to ask the suspects.</p>
+                    <button type="button" className="btn btn-primary tap mt-3 !min-h-12" disabled={powerBusy} onClick={() => power("extra")}>
+                      Give me 3 more
+                    </button>
+                  </>
+                )}
                 {powers.plant && (
                   <>
                     <p className="display m-0 mt-2 text-[22px]">Frame someone</p>
@@ -826,10 +892,10 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
         </div>
       )}
 
-      {poke && !hot && (
+      {poke && showPoke && !showHot && (
         <div className="scrim !justify-center px-6" role="alert" style={{ background: "rgba(8,22,38,.94)" }}>
           <div className="rise text-center">
-            <p className="eyebrow m-0">{first(poke.fromName)} is asking you · {pokeLeft}s</p>
+            <p className="eyebrow m-0">{first(poke.fromName)} is asking you</p>
             <p className="display m-0 mt-4 text-[clamp(28px,9vw,38px)]">{poke.question}</p>
             <p className="label mt-5">Answer out loud. Everyone is listening.</p>
             {card?.story && (
@@ -838,15 +904,18 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
                 <p className="m-0 mt-1 text-[15px] leading-snug">“{card.story}”</p>
               </div>
             )}
+            <button type="button" className="btn btn-primary tap mt-6" onClick={() => { sfx.tap(); setClosed((c) => [...c, pokeKey]); }}>
+              Done, back to the case
+            </button>
           </div>
         </div>
       )}
 
-      {hot && (
+      {hot && showHot && (
         <div className="scrim !justify-center px-6" role="alert" style={{ background: "rgba(40,6,18,.92)" }}>
           <div className="rise text-center">
             <p className="eyebrow m-0" style={{ color: "#ff8098" }}>
-              Hot seat · {hotLeft}s
+              Hot seat
             </p>
             <p className="display m-0 mt-3 text-[clamp(44px,15vw,64px)]">{first(hot.playerName)}</p>
             <p className="m-0 mt-4 text-[19px] leading-snug">{hot.question}</p>
@@ -857,6 +926,9 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
                 <p className="m-0 mt-1 text-[15px] leading-snug">“{card.story}”</p>
               </div>
             )}
+            <button type="button" className="btn btn-primary tap mt-6" onClick={() => { sfx.tap(); setClosed((c) => [...c, hotKey]); }}>
+              Done, back to the case
+            </button>
           </div>
         </div>
       )}
@@ -866,7 +938,7 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
 
 function Glyph({ d }: { d: string }) {
   return (
-    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.600" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.800" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d={d} />
     </svg>
   );

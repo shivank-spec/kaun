@@ -46,7 +46,7 @@ function Room({ code }: { code: string }) {
       doubt: (targetId) => run("doubt", { targetId }),
       skip: () => run("skip", {}),
       pause: () => run("pause", {}),
-      power: (power, opts) => post<{ real?: boolean }>(`${base}/power`, { playerId, power, ...opts }).then((r) => {
+      power: (power, opts) => post<{ real?: boolean; clearedName?: string; extra?: number }>(`${base}/power`, { playerId, power, ...opts }).then((r) => {
         refresh();
         return r;
       }),

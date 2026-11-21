@@ -146,6 +146,7 @@ export interface RoomSettings {
     blackoutUntil?: string | null;
     blackoutBy?: string | null;
     detectors: string[]; // players who used their lie detector
+    notes?: string[]; // other powers used, as ready-made lines for the end screen
   } | null;
 }
 
@@ -155,7 +156,7 @@ export interface PlayerCard {
   clues: string[]; // exactly 2
   objective?: string; // culprit only
   /** Secret powers still unused this round. Culprit: plant + blackout. Innocent: detector. */
-  powers?: { plant?: boolean; blackout?: boolean; detector?: boolean };
+  powers?: { plant?: boolean; blackout?: boolean; detector?: boolean; clear?: boolean; extra?: boolean };
   job?: string; // who you are in this case, e.g. "Head of security"
   story?: string; // where you say you were: your answer when anyone asks
 }

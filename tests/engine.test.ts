@@ -61,3 +61,11 @@ test("scoring rewards the right accusation, clues and speed", () => {
   assert.equal(cracked.contradictions, 2);
   assert.ok(cracked.score > fast.score);
 });
+
+test("room stories never call a player he or she", async () => {
+  const { neutralText } = await import("../lib/rooms");
+  assert.equal(
+    neutralText("Vikram was caught and confessed, noting her stress. The paper was found in her bag. She was tired; he's done. Ask her."),
+    "Vikram was caught and confessed, noting their stress. The paper was found in their bag. They were tired; they're done. Ask them.",
+  );
+});
