@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { chatJSON } from "./ai";
 import { generateCase } from "./generate-case";
 import { store, type PlayerRow, type RoomRow } from "./store";
 import { narrate } from "./voice";
@@ -250,6 +251,58 @@ export async function castVote(codeRaw: string, playerId: string, targetId: stri
   return { ok: true };
 }
 
+const POKE_SECONDS = 14;
+
+/**
+ * Ask a suspect a question during the discussion.
+ * An AI suspect answers in character straight away. A human suspect gets the
+ * question on their own phone and has to answer out loud.
+ */
+export async function askSuspect(codeRaw: string, playerId: string, targetId: string, rawQuestion: unknown) {
+  const code = codeRaw.toUpperCase();
+  const db = store();
+  const room = await db.getRoom(code);
+  if (!room) throw new GameError("No room with that code", 404);
+  if (room.status !== "discuss" || !room.case_file) throw new GameError("Questions are closed");
+  const players = await db.listPlayers(code);
+  const me = players.find((p) => p.id === playerId);
+  const target = players.find((p) => p.id === targetId);
+  if (!me || !target || target.id === me.id) throw new GameError("Pick someone to question");
+  const question = String(rawQuestion ?? "").replace(/\s+/g, " ").trim().slice(0, 140) || "Where were you?";
+
+  if (!target.is_bot) {
+    await db.updatePlayer(target.id, { poke: { fromName: me.name, question, at: new Date().toISOString() } });
+    return { delivered: true };
+  }
+
+  const file = room.case_file;
+  const who = file.suspects.find((x) => x.id === target.id);
+  if (!who) return { reply: "I have nothing to add." };
+  const saw = (who.private_clues ?? []).join(" / ");
+  try {
+    const raw = (await chatJSON({
+      kind: "chat",
+      temperature: 0.95,
+      maxTokens: 400,
+      groqTimeoutMs: 6000,
+      system: `You are ${who.name}, ${who.role}, a suspect being questioned in a tense crime drama. You are INNOCENT, but nervous.
+CASE: ${file.title}. ${file.crime}
+Your story: ${who.public_alibi}
+Something private you would rather hide (not a crime): ${who.innocent_secret}
+What you noticed that night: ${saw || "nothing unusual"}
+Personality: ${who.persona}. You speak like this: ${who.speaking_style}.
+Answer the question in 1-2 short, vivid sentences, in character, plain English, no jargon. If asked what you saw or who you suspect, share what you noticed. Never name the culprit as a fact; you only know what you saw.
+Return ONLY JSON: {"reply": string}`,
+      user: `${me.name} asks you: ${question}`,
+    })) as { reply?: unknown };
+    const reply = typeof raw.reply === "string" && raw.reply.trim() ? raw.reply.trim() : "";
+    if (reply) return { reply };
+  } catch {
+    // fall through to a line built from the case facts
+  }
+  return { reply: saw ? `${who.public_alibi}. But I will tell you this: ${(who.private_clues ?? [])[0]}` : `${who.public_alibi}. That is all I know.` };
+}
+
 /** The host can cut a phase short once everyone is ready. */
 export async function skipPhase(codeRaw: string, playerId: string) {
   const code = codeRaw.toUpperCase();
@@ -362,6 +415,14 @@ async function advance(room: RoomRow, players: PlayerRow[]): Promise<RoomRow> {
   return (await db.getRoom(room.code)) ?? room;
 }
 
+/** A question fired at this player stays on their screen for a few seconds. */
+function pokeOf(p: PlayerRow) {
+  if (!p.poke) return null;
+  const end = Date.parse(p.poke.at) + POKE_SECONDS * 1000;
+  if (Date.now() >= end) return null;
+  return { fromName: p.poke.fromName, question: p.poke.question, endsAt: new Date(end).toISOString() };
+}
+
 const HOT_SEAT_SECONDS = 15;
 
 /** The hot seat question is live for 15 s starting at the halfway point of discussion. */
@@ -445,6 +506,7 @@ export async function getRoomView(codeRaw: string, playerId: string | null): Pro
           isHost: me.is_host,
           card: showCard ? me.card : null,
           doubting: me.doubt ?? null,
+          poke: pokeOf(me),
           votedFor: me.vote ?? null,
         }
       : null,

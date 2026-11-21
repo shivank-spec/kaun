@@ -152,8 +152,9 @@ RULES
 - "culprit_objective" is a specific false claim the culprit must convince others of, e.g. "Convince everyone the CCTV was already down at 9:40 pm."
 - "innocent_secret" is a private, non-criminal thing the person would rather hide (a secret job interview, a hidden debt, meeting someone they should not, breaking a workplace rule). It explains why they looked suspicious.
 - "intro" (2-3 sentences) sets the scene without naming the culprit.
-- "ending_caught" and "ending_escaped" are 2 short sentences each. The first sentence says, in plain words, who did it and how. The second says how they were caught, or how they got away.
-- PLAIN WORDS: write so a 12-year-old follows it on first read. No technical jargon at all: never say VPN, MAC address, checksum, exfiltrate, metadata, hash, server log, firmware. Say "the door camera", "her phone records", "his fingerprint", "the receipt".
+- "ending_caught" and "ending_escaped" are 2-3 punchy sentences each, written like the last scene of a thriller: who did it, the clever way they did it, and the one slip that caught them (or the nerve that let them walk).
+- VOICE: vivid, tense and fun to read aloud. Sharp details, a twist, a little swagger. Clear on first read.
+- NO TECH JARGON: never say VPN, MAC address, checksum, exfiltrate, metadata, hash, firmware. Say "the door camera", "her phone records", "his fingerprint", "the receipt".
 - "roast" is one dry, cutting line about the culprit, the kind a detective says while closing the file.
 - LANGUAGE: write everything in plain English only. No Hindi, Bengali or Hinglish words anywhere (names of people and places are fine).
 - Keep every string tight: under 30 words each. No markdown. Output ONLY the complete JSON object with every key present.`;

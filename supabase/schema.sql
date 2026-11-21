@@ -53,3 +53,5 @@ create table if not exists tts_cache (
 alter table tts_cache enable row level security;
 -- Who each player currently doubts (live suspicion meter during discussion).
 alter table players add column if not exists doubt uuid;
+-- A question one player fires at another during the discussion.
+alter table players add column if not exists poke jsonb;

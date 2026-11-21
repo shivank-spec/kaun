@@ -45,6 +45,8 @@ function Room({ code }: { code: string }) {
       again: () => run("again", {}),
       doubt: (targetId) => run("doubt", { targetId }),
       skip: () => run("skip", {}),
+      ask: (targetId, question) =>
+        post<{ reply?: string; delivered?: boolean }>(`${base}/ask`, { playerId, targetId, question }),
       home: () => router.push("/"),
     };
   }, [code, mine?.playerId, refresh, router]);

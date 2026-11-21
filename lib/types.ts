@@ -185,6 +185,8 @@ export interface RoomView {
     isHost: boolean;
     card: PlayerCard | null;
     doubting?: string | null; // who you currently doubt
+    /** A question another player just fired at you. Answer it out loud. */
+    poke?: { fromName: string; question: string; endsAt: string } | null;
     votedFor?: string | null;
   } | null;
   case: { title: string; crime: string; intro: string; setting?: string; facts?: CaseFacts } | null; // null in lobby

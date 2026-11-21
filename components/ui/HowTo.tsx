@@ -10,7 +10,7 @@ const STEPS = {
   ],
   party: [
     ["Read your card", "Hold the scanner to see your secret role. Don't show anyone."],
-    ["Talk it out", "Say what you saw, out loud. The culprit will lie. Swipe the cards to check everyone's story."],
+    ["Question everyone", "Open a suspect's card and question them. AI suspects answer on the spot. Friends have to answer out loud."],
     ["Vote", "Tap the person you think did it, then lock it in. Most votes gets accused."],
   ],
 } as const;

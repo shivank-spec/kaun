@@ -17,6 +17,7 @@ export interface RoomActions {
   again: () => Promise<void>;
   doubt: (targetId: string | null) => Promise<void>;
   skip: () => Promise<void>;
+  ask: (targetId: string, question: string) => Promise<{ reply?: string; delivered?: boolean }>;
   home: () => void;
 }
 
@@ -437,6 +438,37 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
   const evidence = room.botClues ?? [];
   const [open, setOpen] = useState<string | null>(null); // "case" | "role" | "evidence" | player id
   const [fresh, setFresh] = useState(0); // evidence the player has not opened yet
+  const [asksLeft, setAsksLeft] = useState(3);
+  const [asking, setAsking] = useState(false);
+  const [talk, setTalk] = useState<Record<string, { q: string; a: string }[]>>({});
+  const poke = you?.poke ?? null;
+  const pokeLeft = poke ? Math.max(0, Math.ceil((Date.parse(poke.endsAt) - Date.parse(room.serverNow)) / 1000)) : 0;
+  const lastPoke = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (poke && lastPoke.current !== poke.question + poke.endsAt) {
+      lastPoke.current = poke.question + poke.endsAt;
+      setOpen(null);
+      sfx.crack();
+    }
+  }, [poke]);
+
+  async function ask(targetId: string, question: string, isBot: boolean) {
+    if (asking || asksLeft <= 0) return;
+    setAsking(true);
+    setAsksLeft((n) => n - 1);
+    sfx.tap();
+    try {
+      const r = await actions.ask(targetId, question);
+      const a = isBot ? (r.reply ?? "...") : "Sent to their phone. Make them answer out loud.";
+      setTalk((t) => ({ ...t, [targetId]: [...(t[targetId] ?? []), { q: question, a }] }));
+      if (isBot) sfx.clue();
+    } catch {
+      setAsksLeft((n) => n + 1);
+    } finally {
+      setAsking(false);
+    }
+  }
   const seenEvidence = useRef(evidence.length);
   const lastHot = useRef<string | null>(null);
 
@@ -466,9 +498,12 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
       <div className="mt-1">
         <Timer seconds={secondsLeft ?? 0} total={total} label="Discussion" sub="Talk it out loud" />
       </div>
-      <p className="m-0 mt-3 text-[15px] leading-snug text-[#E3E8F2]">
-        One of you did it. Open the cards, say what you know, and work out who is lying.
-      </p>
+      <div className="mt-3 flex items-start justify-between gap-3">
+        <p className="m-0 text-[15px] leading-snug text-[#E3E8F2]">One of you did it. Open a suspect and question them.</p>
+        <span className="label shrink-0 rounded-full px-2.5 py-1.5 text-snow" style={{ boxShadow: "inset 0 0 0 1px rgba(95,221,247,.5)" }}>
+          {asksLeft} {asksLeft === 1 ? "question" : "questions"} left
+        </span>
+      </div>
 
       <div className="mt-3 grid min-h-[260px] flex-1 auto-rows-fr grid-cols-2 gap-2.5">
         <Tile title="The case" hint="What happened" accent="#5FDDF7" wide={(3 + others.length) % 2 === 1} onOpen={() => setOpen("case")}>
@@ -545,6 +580,31 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
                     </div>
                   ))}
                 </div>
+                {evidence.length > 0 && (
+                  <>
+                    <p className="label m-0 mt-4 text-snow">Who does this point at?</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {others.map((p) => {
+                        const on = you?.doubting === p.id;
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            aria-pressed={on}
+                            className="chip tap !min-h-11 !px-3"
+                            style={on ? { background: "rgba(240,56,90,.2)", boxShadow: "inset 0 0 0 1.5px #F0385A", color: "#F4F6FA" } : undefined}
+                            onClick={() => {
+                              sfx.tap();
+                              void actions.doubt(on ? null : p.id).catch(() => {});
+                            }}
+                          >
+                            {label(room, p.name)} · {p.doubt ?? 0}%
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
               </div>
             )}
             {opened && (
@@ -561,9 +621,32 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
                     <p className="m-0 text-[16px] leading-snug">“{opened.alibi}”</p>
                   </>
                 )}
+                <div className="mt-3 flex w-full flex-col gap-2 text-left">
+                  {(talk[opened.id] ?? []).map((t, i) => (
+                    <div key={i} className="rise rounded-[12px] bg-black/30 px-3.5 py-2.5">
+                      <p className="label m-0">You asked: {t.q}</p>
+                      <p className="m-0 mt-1 text-[15px] leading-snug">{t.a}</p>
+                    </div>
+                  ))}
+                  {asking && <p className="blink m-0 text-center text-[14px] text-mist">{opened.isBot ? `${first(opened.name)} is choosing their words` : "Sending"}</p>}
+                </div>
+                <p className="label m-0 mt-2 text-snow">
+                  {asksLeft > 0
+                    ? opened.isBot
+                      ? `Question them · ${asksLeft} left`
+                      : `Put them on the spot · ${asksLeft} left`
+                    : "No questions left this round"}
+                </p>
+                <div className="grid w-full grid-cols-1 gap-1.5">
+                  {["Where exactly were you?", "What did you see?", "Who do you think did it?"].map((q) => (
+                    <button key={q} type="button" className="chip tap !min-h-11 !text-[14px]" disabled={asking || asksLeft <= 0} onClick={() => ask(opened.id, q, Boolean(opened.isBot))}>
+                      {q}
+                    </button>
+                  ))}
+                </div>
                 <button
                   type="button"
-                  className={`btn tap mt-4 ${you?.doubting === opened.id ? "btn-danger" : "btn-glass"}`}
+                  className={`btn tap mt-2 ${you?.doubting === opened.id ? "btn-danger" : "btn-glass"}`}
                   onClick={() => {
                     sfx.tap();
                     void actions.doubt(you?.doubting === opened.id ? null : opened.id).catch(() => {});
@@ -576,6 +659,16 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
             <button type="button" className="btn btn-primary tap" onClick={() => setOpen(null)}>
               Close card
             </button>
+          </div>
+        </div>
+      )}
+
+      {poke && !hot && (
+        <div className="scrim !justify-center px-6" role="alert" style={{ background: "rgba(8,22,38,.94)" }}>
+          <div className="rise text-center">
+            <p className="eyebrow m-0">{first(poke.fromName)} is asking you · {pokeLeft}s</p>
+            <p className="display m-0 mt-4 text-[clamp(28px,9vw,38px)]">{poke.question}</p>
+            <p className="label mt-5">Answer out loud. Everyone is listening.</p>
           </div>
         </div>
       )}
