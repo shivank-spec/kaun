@@ -141,6 +141,8 @@ export interface RoomReveal {
   accusedName: string | null;
   caught: boolean;
   story: string;
+  /** Exactly what the narrator reads. Its audio is prepared during the discussion. */
+  narration: string;
   roast: string;
   votes: { voterId: string; voterName: string; targetId: string; targetName: string }[];
 }

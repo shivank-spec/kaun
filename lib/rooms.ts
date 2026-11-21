@@ -1,6 +1,8 @@
 import crypto from "crypto";
+import { after } from "next/server";
 import { generateCase } from "./generate-case";
 import { store, type PlayerRow, type RoomRow } from "./store";
+import { narrate } from "./voice";
 import type {
   CaseFile,
   PlayerCard,
@@ -186,6 +188,10 @@ export async function startRoom(
 
 /* ---------------- vote / reveal ---------------- */
 
+/** The narrator's script for an ending. Both are known from the start of the round. */
+const narrationOf = (file: CaseFile, caught: boolean) =>
+  `${caught ? file.ending_caught : file.ending_escaped} ${file.roast}`;
+
 function buildReveal(file: CaseFile, players: PlayerRow[]): RoomReveal {
   const nameOf = (id: string | null) => players.find((p) => p.id === id)?.name ?? "nobody";
   const tally = new Map<string, number>();
@@ -203,6 +209,7 @@ function buildReveal(file: CaseFile, players: PlayerRow[]): RoomReveal {
     accusedName: accusedId ? nameOf(accusedId) : null,
     caught,
     story: caught ? file.ending_caught : `${framed}${noVerdict}${file.ending_escaped}`,
+    narration: narrationOf(file, caught),
     roast: file.roast,
     votes: players
       .filter((p) => p.vote)
@@ -286,6 +293,19 @@ async function advance(room: RoomRow, players: PlayerRow[]): Promise<RoomRow> {
   }
   if (!next) return room;
   const moved = await db.updateRoomIf(room.code, next.expected, next.patch);
+  if (moved && next.patch.status === "discuss" && room.case_file) {
+    // While everyone argues, record the narrator reading both possible endings,
+    // so the reveal plays the instant the votes are in.
+    const file = room.case_file;
+    const noir = room.settings.tone === "noir";
+    try {
+      after(() =>
+        Promise.allSettled([narrate(narrationOf(file, true), noir), narrate(narrationOf(file, false), noir)]),
+      );
+    } catch {
+      // Outside a request (tests): skip the warm-up.
+    }
+  }
   if (moved && next.patch.status === "vote" && room.case_file) {
     // Bots vote the moment voting opens: right about half the time.
     const culprit = room.case_file.culprit_id;

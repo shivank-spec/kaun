@@ -573,7 +573,7 @@ export function Verdict({ room, actions }: Props) {
   const [busy, setBusy] = useState(false);
   const [xp, setXp] = useState({ gained: 0, total: 0 });
   const audio = useRef<HTMLAudioElement | null>(null);
-  const text = `${r.story} ${r.roast}`;
+  const text = r.narration || `${r.story} ${r.roast}`;
   const culpritIdx = indexOf(room, r.culpritId);
   const tally = room.players
     .map((p, i) => ({ p, i, n: r.votes.filter((v) => v.targetId === p.id).length }))
