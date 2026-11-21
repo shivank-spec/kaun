@@ -60,7 +60,11 @@ export default function Solo() {
       const v = await post<SoloCaseView>("/api/case", {
         setting: q.get("setting") || "Kolkata",
         tone: q.get("tone") || "desi",
+        seen: JSON.parse(localStorage.getItem("kaun.seen") || "[]"),
       });
+      // Remember what this phone has played so the next case is always new.
+      const seen: string[] = JSON.parse(localStorage.getItem("kaun.seen") || "[]");
+      localStorage.setItem("kaun.seen", JSON.stringify([...seen, v.title].slice(-60)));
       setView(v);
       setActive(v.suspects[0].id);
       setLeft(v.durationSec);

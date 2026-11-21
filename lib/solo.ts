@@ -89,14 +89,40 @@ Return ONLY JSON: {"reply": string, "reveal_clue_id": string | null}`;
     .map((m) => `${m.from === "you" ? "DETECTIVE" : me.name.toUpperCase()}: ${m.text}`)
     .join("\n");
 
-  const raw = (await chatJSON({
-    system,
-    user: `${convo ? convo + "\n" : ""}DETECTIVE: ${message.slice(0, 300)}`,
-    kind: "chat",
-    temperature: 0.9,
-    maxTokens: 500,
-    groqTimeoutMs: 6000,
-  })) as { reply?: unknown; reveal_clue_id?: unknown };
+  let raw: { reply?: unknown; reveal_clue_id?: unknown };
+  try {
+    raw = (await chatJSON({
+      system,
+      user: `${convo ? convo + "\n" : ""}DETECTIVE: ${message.slice(0, 300)}`,
+      kind: "chat",
+      temperature: 0.9,
+      maxTokens: 500,
+      groqTimeoutMs: 6000,
+    })) as { reply?: unknown; reveal_clue_id?: unknown };
+  } catch {
+    // The AI is rate limited or down. Answer from the case facts instead, so the
+    // game stays playable and every clue can still be found.
+    const turns = history.filter((m) => m.from === "you").length;
+    if (held.length) {
+      const k = held[0];
+      return {
+        reply: `Theek hai, theek hai. I will tell you what I know: ${k.text}`,
+        unlockedClue: { id: k.id, text: k.text },
+      };
+    }
+    const lines = isCulprit
+      ? [
+          `I already told you. ${me.public_alibi}`,
+          `Listen carefully: ${file.culprit_objective.replace(/^convince everyone (that )?/i, "")}. That is what really happened.`,
+          `Why are you only asking me? ${file.suspects.find((x) => x.id !== me.id)!.name} was acting far stranger.`,
+        ]
+      : [
+          `${me.public_alibi} That is all, I swear.`,
+          `Fine. The truth is embarrassing: ${me.innocent_secret} But I had nothing to do with the crime.`,
+          `I have told you everything. Go and ask the others.`,
+        ];
+    return { reply: lines[turns % lines.length], unlockedClue: null };
+  }
 
   const reply = typeof raw.reply === "string" && raw.reply.trim() ? raw.reply.trim() : "...";
   const clue = held.find((k) => k.id === raw.reveal_clue_id) ?? null;

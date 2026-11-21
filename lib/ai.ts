@@ -12,6 +12,16 @@ const groq = () =>
     maxRetries: 0,
   });
 
+// Optional: Google Gemini through its OpenAI-compatible endpoint. Its free tier
+// has far more headroom, so when a key is present it goes first.
+const gemini = () =>
+  new OpenAI({
+    apiKey: process.env.GEMINI_API_KEY,
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+    maxRetries: 0,
+  });
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
+
 export const openai = () =>
   new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 0 });
 
@@ -72,6 +82,13 @@ export async function chatJSON(c: JsonCall): Promise<unknown> {
   if (kind === "chat") {
     const shift = turn++ % 2; // alternate between the two light models
     models = [models[shift], models[1 - shift], models[2]];
+  }
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      return await callJSON(gemini(), GEMINI_MODEL, c, 9000, false);
+    } catch (e) {
+      console.warn("[ai] gemini failed:", (e as Error).message.slice(0, 140));
+    }
   }
   if (process.env.GROQ_API_KEY) {
     for (const model of models) {
