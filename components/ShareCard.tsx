@@ -62,7 +62,7 @@ export default function ShareCard({
   roast,
   caught,
   votes,
-  siteUrl = "playkaun.vercel.app",
+  siteUrl = "playalibi.vercel.app",
 }: ShareCardProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [dataUrl, setDataUrl] = useState("");
@@ -116,7 +116,7 @@ export default function ShareCard({
       ctx.textAlign = "left";
       ctx.fillStyle = "#F4F6FA";
       ctx.font = `700 54px ${DISPLAY}`;
-      ctx.fillText("KAUN?", M, 150);
+      ctx.fillText("ALIBI", M, 150);
       ctx.textAlign = "right";
       ctx.font = `500 26px ${MONO}`;
       ctx.fillStyle = "#AEB6C8";
@@ -226,7 +226,7 @@ export default function ShareCard({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const link = document.createElement("a");
-    link.download = "kaun-case.png";
+    link.download = "alibi-case.png";
     link.href = dataUrl || canvas.toDataURL("image/png");
     document.body.appendChild(link);
     link.click();
@@ -241,9 +241,9 @@ export default function ShareCard({
     try {
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
       if (blob && navigator.share) {
-        const file = new File([blob], "kaun-case.png", { type: "image/png" });
+        const file = new File([blob], "alibi-case.png", { type: "image/png" });
         if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-          await navigator.share({ title: "Kaun?", text: `${headline}. Play at ${siteUrl}`, files: [file] });
+          await navigator.share({ title: "Alibi", text: `${headline}. Play at ${siteUrl}`, files: [file] });
           setNote("Shared.");
           return;
         }

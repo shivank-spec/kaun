@@ -21,7 +21,7 @@ export function DesktopFrame() {
       <aside className="side side-left" aria-hidden="true">
         <p className="eyebrow">A new mystery every 3 minutes</p>
         <p className="display mt-3 text-[clamp(56px,6vw,92px)] leading-[0.95]">
-          <span className="metal">Kaun</span>
+          <span className="metal">Alibi</span>
           <span style={{ color: "#5FDDF7", WebkitTextFillColor: "#5FDDF7" }}>?</span>
         </p>
         <p className="mt-4 max-w-[22rem] text-[17px] leading-snug text-[#E3E8F2]">

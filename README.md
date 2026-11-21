@@ -1,10 +1,12 @@
-# Kaun?
+# Alibi
+
+_Built as "Kaun?" and renamed on the day; the repository keeps the original name._
 
 A 3-minute AI mystery party game set in Kolkata. Interrogate four suspects on your own, or get a secret role card and accuse your friends out loud. A dramatic CID-style narrator reveals who did it.
 
 Built in one day for the **Play** track at **Vibe Coders Hackathon Edition 3** (Calcutta AI Club, AIC Techno, 21 November 2026).
 
-**Play it:** https://playkaun.vercel.app
+**Play it:** https://playalibi.vercel.app
 
 ## Demo video
 

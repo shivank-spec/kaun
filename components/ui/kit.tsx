@@ -39,7 +39,7 @@ export function TopBar({
           </button>
         )}
       </div>
-      <span className="display text-[19px] tracking-[0.02em]">KAUN?</span>
+      <span className="display text-[19px] tracking-[0.06em]">ALIBI</span>
       <div className="flex w-11 justify-end">{right}</div>
     </header>
   );

@@ -124,7 +124,7 @@ export default function Home() {
   return (
     <main className="screen" onPointerDown={unlockSfx}>
       <header className="flex h-11 shrink-0 items-center justify-between">
-        <span className="display text-[20px] tracking-[0.02em]">KAUN?</span>
+        <span className="display text-[20px] tracking-[0.06em]">ALIBI</span>
         <button
           type="button"
           onClick={() => setHelp(true)}
@@ -146,8 +146,8 @@ export default function Home() {
       </div>
 
       <div className="flex shrink-0 flex-col items-center gap-1.5 pb-[clamp(16px,4vh,36px)]">
-        <h1 className="display m-0 text-[clamp(56px,19vw,78px)] leading-none tracking-[-0.03em]" aria-label="Kaun?">
-          <span className="metal">Kaun</span>
+        <h1 className="display m-0 text-[clamp(56px,19vw,78px)] leading-none tracking-[-0.03em]" aria-label="Alibi">
+          <span className="metal">Alibi</span>
           <span style={{ color: "#5FDDF7", WebkitTextFillColor: "#5FDDF7", textShadow: "0 0 22px rgba(95,221,247,.55)" }}>
             ?
           </span>

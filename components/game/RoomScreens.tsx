@@ -120,7 +120,7 @@ export function Lobby({ room, actions }: Props) {
     sfx.tap();
     try {
       if (navigator.share) {
-        await navigator.share({ title: "Kaun?", text: `Join my Kaun? room: ${room.code}`, url });
+        await navigator.share({ title: "Alibi", text: `Join my Alibi room: ${room.code}`, url });
         return;
       }
     } catch {
@@ -875,7 +875,7 @@ export function Verdict({ room, actions }: Props) {
           <div className="sheet flex max-h-[90%] flex-col gap-3 overflow-y-auto p-5 pb-[max(20px,env(safe-area-inset-bottom))]">
             <ShareCard
               headline={r.caught ? `${r.culpritName} arrested` : `${r.culpritName} walks free`}
-              caseTitle={room.case?.title ?? "Kaun?"}
+              caseTitle={room.case?.title ?? "Alibi"}
               roast={r.roast}
               caught={r.caught}
               votes={r.votes.map((v) => ({ voterName: v.voterName, targetName: v.targetName }))}

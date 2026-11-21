@@ -9,12 +9,12 @@ const grotesk = Space_Grotesk({ variable: "--f-grotesk", subsets: ["latin"] });
 const mono = JetBrains_Mono({ variable: "--f-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://playkaun.vercel.app"),
-  title: "Kaun? Find the culprit. Hide your role.",
+  metadataBase: new URL("https://playalibi.vercel.app"),
+  title: "Alibi: find the culprit, hide your role",
   description:
     "A 3-minute AI mystery game set in Kolkata. Interrogate the suspects alone, or accuse your friends.",
   openGraph: {
-    title: "Kaun?",
+    title: "Alibi",
     description: "Find the culprit. Hide your role. A new mystery every 3 minutes.",
     type: "website",
   },

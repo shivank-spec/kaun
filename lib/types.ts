@@ -1,4 +1,4 @@
-// Shared types for Kaun? — the single source of truth for every laptop.
+// Shared types for Alibi — the single source of truth for every laptop.
 // Do not change these shapes without telling the whole team.
 
 export type Tone = "desi" | "noir";
