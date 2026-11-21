@@ -113,12 +113,12 @@ Return ONLY JSON: {"reply": string, "reveal_clue_id": string | null}`;
     const lines = isCulprit
       ? [
           `I already told you. ${me.public_alibi}`,
-          `Listen carefully: ${file.culprit_objective.replace(/^convince everyone (that )?/i, "")}. That is what really happened.`,
+          `Listen carefully: ${file.culprit_objective.replace(/^convince everyone (that )?/i, "").replace(/\.$/, "")}. That is what really happened.`,
           `Why are you only asking me? ${file.suspects.find((x) => x.id !== me.id)!.name} was acting far stranger.`,
         ]
       : [
           `${me.public_alibi} That is all, I swear.`,
-          `Fine. The truth is embarrassing: ${me.innocent_secret} But I had nothing to do with the crime.`,
+          `Fine, write this in your file and tell nobody: "${me.innocent_secret}" Embarrassing, yes. Criminal, no.`,
           `I have told you everything. Go and ask the others.`,
         ];
     return { reply: lines[turns % lines.length], unlockedClue: null };
