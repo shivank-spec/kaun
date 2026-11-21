@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 
 const STEPS = {
   solo: [
-    ["Search", "Tap the glowing dots on the map to find evidence."],
-    ["Question", "Tap a suspect, then Ask, Press or Confront. You have a few moves, so choose well."],
-    ["Accuse", "Press Accuse and pick who did it. One of the four is lying."],
+    ["Search the scene", "It's free. You'll find evidence, but some of it points at the wrong person."],
+    ["Question the suspects", "Tap a suspect and ask. Each question uses one move. Push harder or show them evidence to break their story."],
+    ["Accuse", "When you know who is lying, tap \"I know who did it\". You get one guess."],
   ],
   party: [
     ["Read the case and your card", "Everyone sees the case. Then you get a secret card: who you are, your story, and what you saw."],

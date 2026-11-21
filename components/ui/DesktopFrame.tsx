@@ -30,8 +30,8 @@ export function DesktopFrame() {
         </p>
         <ol className="mt-8 flex max-w-[22rem] list-none flex-col gap-4 p-0">
           {[
-            ["01", "Search the scene", "Tap the glowing spots. Not all evidence tells the truth."],
-            ["02", "Ask, press, confront", "Six moves. Break the liar's story with real evidence."],
+            ["01", "Search the scene", "Find the evidence. Not all of it tells the truth."],
+            ["02", "Question the suspects", "Ask, push harder, or show them evidence until a story cracks."],
             ["03", "Accuse", "One accusation. The narrator tells you if you got it right."],
           ].map(([n, t, d]) => (
             <li key={n} className="flex gap-4">

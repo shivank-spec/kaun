@@ -28,7 +28,7 @@ import type {
 } from "@/lib/types";
 
 type Stage = "loading" | "brief" | "play" | "accuse" | "verdict" | "error";
-type Sheet = null | "ask" | "confront" | "file" | "share";
+type Sheet = null | "scene" | "suspect" | "confront" | "file" | "share";
 interface FoundClue {
   id: string;
   text: string;
@@ -37,7 +37,6 @@ interface FoundClue {
 
 const COST: Record<AskMode, number> = { ask: 1, press: 2, confront: 1 };
 const QUESTIONS = ["Where were you?", "What did you see?", "Who looks guilty to you?", "What are you hiding?"];
-const ROOMS = ["Entrance", "Back room", "Side hall", "Main floor"];
 
 async function post<T>(url: string, data: unknown): Promise<T> {
   const res = await fetch(url, {
@@ -50,11 +49,6 @@ async function post<T>(url: string, data: unknown): Promise<T> {
   return json as T;
 }
 
-/** Where things sit on the map, as percentages of the map box. */
-const roomBox = (r: number) => ({ left: (r % 2) * 50, top: Math.floor(r / 2) * 50 });
-const suspectPos = (r: number) => ({ x: roomBox(r).left + 17, y: roomBox(r).top + 31 });
-const spotPos = (r: number) => ({ x: roomBox(r).left + 36, y: roomBox(r).top + 19 });
-
 export default function Solo() {
   const router = useRouter();
   const [stage, setStage] = useState<Stage>("loading");
@@ -66,6 +60,7 @@ export default function Solo() {
   const [confronted, setConfronted] = useState<string[]>([]);
   const [cracks, setCracks] = useState(0);
   const [cleared, setCleared] = useState<string[]>([]);
+  const [crackedIds, setCrackedIds] = useState<string[]>([]);
   const [shaken, setShaken] = useState(false);
   const [used, setUsed] = useState(0);
   const [left, setLeft] = useState(150);
@@ -73,7 +68,6 @@ export default function Solo() {
   const [sheet, setSheet] = useState<Sheet>(null);
   const [draft, setDraft] = useState("");
   const [toast, setToast] = useState<{ title: string; text: string } | null>(null);
-  const [me, setMe] = useState({ x: 50, y: 50 });
   const [pick, setPick] = useState("");
   const [name, setName] = useState("");
   const [verdict, setVerdict] = useState<SoloVerdict | null>(null);
@@ -93,6 +87,7 @@ export default function Solo() {
     setConfronted([]);
     setCracks(0);
     setCleared([]);
+    setCrackedIds([]);
     setUsed(0);
     setPick("");
     setVerdict(null);
@@ -113,7 +108,6 @@ export default function Solo() {
       localStorage.setItem("kaun.seen", JSON.stringify([...seen, v.title].slice(-60)));
       setView(v);
       setActive(v.suspects[0].id);
-      setMe(suspectPos(v.suspects[0].room));
       setLeft(v.durationSec);
       setStage("brief");
     } catch {
@@ -146,17 +140,8 @@ export default function Solo() {
     toastTimer.current = setTimeout(() => setToast(null), 3400);
   }
 
-  function goTo(suspectId: string) {
-    if (!view) return;
-    const s = view.suspects.find((x) => x.id === suspectId)!;
-    sfx.tap();
-    setActive(suspectId);
-    setMe(suspectPos(s.room));
-  }
-
   function inspect(spot: MapSpot) {
     if (seenSpots.includes(spot.id)) return;
-    setMe(spotPos(spot.room));
     setSeenSpots((s) => [...s, spot.id]);
     setTimeout(() => {
       sfx.clue();
@@ -176,7 +161,6 @@ export default function Solo() {
     const say =
       mode === "press" ? "Stop dodging. Tell me the truth." : mode === "confront" ? `Explain this: ${clue?.text ?? ""}` : (opts.message ?? QUESTIONS[1]);
     const history = logs[suspectId] ?? [];
-    setSheet(null);
     setDraft("");
     setBusy(true);
     setUsed((u) => u + COST[mode]);
@@ -201,6 +185,7 @@ export default function Solo() {
       if (r.contradiction && opts.clueId && !confronted.includes(opts.clueId)) {
         setConfronted((c) => [...c, opts.clueId!]);
         setCracks((n) => Math.min(2, n + 1));
+        setCrackedIds((c) => (c.includes(suspectId) ? c : [...c, suspectId]));
         setShaken(true);
         setTimeout(() => setShaken(false), 450);
         sfx.crack();
@@ -344,8 +329,9 @@ export default function Solo() {
         )}
         <p className="eyebrow mt-4">Case file {fileNo}</p>
         <h1 className="display m-0 mt-1 text-[clamp(24px,7.4vw,30px)] uppercase">{view.title}</h1>
-        {view.facts ? (
-          <div className="panel mt-2.5 px-3.5 py-1">
+        <p className="m-0 mt-2 text-[15.5px] leading-snug text-[#E3E8F2]">{view.intro}</p>
+        {view.facts && (
+          <div className="panel mt-3 px-3.5 py-1">
             {(
               [
                 ["What", view.facts.what],
@@ -359,11 +345,13 @@ export default function Solo() {
               </div>
             ))}
           </div>
-        ) : (
-          <p className="m-0 mt-2 text-[15px] leading-snug text-[#E3E8F2]">{view.crime}</p>
         )}
+        <div className="mt-3 rounded-[12px] px-3.5 py-2.5" style={{ background: "rgba(95,221,247,.1)", boxShadow: "inset 0 0 0 1px rgba(95,221,247,.45)" }}>
+          <p className="label m-0 text-cyan">Your job</p>
+          <p className="m-0 mt-0.5 text-[15px] font-semibold leading-snug">{view.goal} Four people were there. One of them is lying to you.</p>
+        </div>
 
-        <p className="label mt-4 text-snow">Suspects · one is lying</p>
+        <p className="label mt-4 text-snow">The four suspects and what they claim</p>
         <div className="mt-2 grid min-h-[190px] flex-1 auto-rows-fr grid-cols-2 gap-2.5">
           {view.suspects.map((s, i) => (
             <div
@@ -389,7 +377,7 @@ export default function Solo() {
             sfx.tap();
             startedAt.current = Date.now();
             setStage("play");
-            flash("How to play", `Tap a glowing spot to search it. Tap a suspect to question them. You have ${view.actions} moves.`);
+            
           }}
         >
           Begin Investigation
@@ -401,12 +389,31 @@ export default function Solo() {
   }
 
   if (stage === "play") {
-    const suspect = view.suspects.find((s) => s.id === active)!;
-    const idx = view.suspects.findIndex((s) => s.id === active);
-    const log = logs[active] ?? [];
-    const last = [...log].reverse().find((m) => m.from === "suspect");
-    const asked = [...log].reverse().find((m) => m.from === "you");
     const movesLeft = view.actions - used;
+    const spotsLeft = view.spots.filter((x) => !seenSpots.includes(x.id)).length;
+    const suspect = view.suspects.find((x) => x.id === active)!;
+    const idx = view.suspects.findIndex((x) => x.id === active);
+    const log = logs[active] ?? [];
+    const statusOf = (id: string) =>
+      crackedIds.includes(id)
+        ? { text: "Story cracked", color: "#F0385A" }
+        : cleared.includes(id)
+          ? { text: "Cleared", color: "#B6F36A" }
+          : (logs[id]?.length ?? 0) > 0
+            ? { text: "Questioned", color: "#AEB6C8" }
+            : { text: "Tap to question", color: "#5FDDF7" };
+    // One line that always says what to do next.
+    const guide =
+      cracks >= 1
+        ? "Someone's story just cracked. If you're sure, accuse them."
+        : spotsLeft === view.spots.length && used === 0
+          ? "Start by searching the scene. Then tap a suspect to question them."
+          : clues.length > 0 && confronted.length === 0 && used > 0
+            ? "You have evidence. Open a suspect and show it to them."
+            : movesLeft <= 1
+              ? "Almost out of moves. Time to accuse someone."
+              : "Question each suspect. The liar's story won't hold up.";
+
     return (
       <main key="play" className="screen" onPointerDown={unlockSfx}>
         <TopBar onBack={() => router.push("/")} />
@@ -417,204 +424,177 @@ export default function Solo() {
           </span>
           <span className="flex flex-col items-end gap-1.5 pb-0.5">
             <span className="label text-snow">
-              Actions: {movesLeft} / {view.actions}
+              {movesLeft} {movesLeft === 1 ? "move" : "moves"} left
             </span>
             <Pips total={view.actions} used={used} />
           </span>
         </div>
         <div className="mt-2 h-[3px] shrink-0 overflow-hidden rounded-full bg-white/10">
-          <div
-            className="h-full transition-[width] duration-300 ease-linear"
-            style={{ width: `${Math.max(0, (left / view.durationSec) * 100)}%`, background: left <= 20 ? "#F0385A" : "#F4F6FA" }}
-          />
+          <div className="h-full transition-[width] duration-300 ease-linear" style={{ width: `${Math.max(0, (left / view.durationSec) * 100)}%`, background: left <= 20 ? "#F0385A" : "#F4F6FA" }} />
         </div>
 
-        <div className="mt-3 grid shrink-0 grid-cols-4 gap-2">
-          {view.suspects.map((s, i) => {
-            const on = s.id === active;
-            const state = cleared.includes(s.id) ? "Cleared" : (logs[s.id]?.length ?? 0) > 0 ? "Questioned" : "Not yet";
+        <div className="mt-3 shrink-0 rounded-[12px] px-3.5 py-2.5" style={{ background: "rgba(95,221,247,.1)", boxShadow: "inset 0 0 0 1px rgba(95,221,247,.45)" }}>
+          <p className="label m-0 text-cyan">What to do</p>
+          <p key={guide} className="rise m-0 mt-0.5 text-[15px] font-medium leading-snug">{guide}</p>
+        </div>
+
+        <div className="mt-3 grid min-h-[280px] flex-1 auto-rows-fr grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            onClick={() => {
+              sfx.tap();
+              setSheet("scene");
+            }}
+            className="tap col-span-2 flex items-center justify-between gap-3 rounded-[16px] border-0 px-4 py-3 text-left text-snow"
+            style={{ background: "linear-gradient(180deg, rgba(28,40,66,.9), rgba(12,18,34,.94))", boxShadow: "inset 0 0 0 1px rgba(130,180,230,.22), inset 0 3px 0 #B6F36A" }}
+          >
+            <span>
+              <span className="block text-[16px] font-bold leading-tight">Search the scene</span>
+              <span className="label mt-1 block">{spotsLeft ? `${spotsLeft} things to find · free` : "Everything found"}</span>
+            </span>
+            <span className="mono text-[22px] text-lime">{view.spots.length - spotsLeft}/{view.spots.length}</span>
+          </button>
+          {view.suspects.map((x, i) => {
+            const st = statusOf(x.id);
             return (
               <button
-                key={s.id}
+                key={x.id}
                 type="button"
-                onClick={() => goTo(s.id)}
-                aria-pressed={on}
-                className="tap flex flex-col items-center gap-1 rounded-[12px] border-0 px-1 pb-2 pt-2.5 text-snow"
-                style={{
-                  background: "linear-gradient(180deg, rgba(28,40,66,.9), rgba(12,18,34,.92))",
-                  boxShadow: on ? "inset 0 0 0 1.5px #5FDDF7, 0 0 16px rgba(95,221,247,.25)" : "inset 0 0 0 1px rgba(130,180,230,.22)",
+                onClick={() => {
+                  sfx.tap();
+                  setActive(x.id);
+                  setSheet("suspect");
                 }}
+                className="tap flex flex-col items-center justify-center gap-1 rounded-[16px] border-0 px-2 py-3 text-center text-snow"
+                style={{ background: "linear-gradient(180deg, rgba(28,40,66,.9), rgba(12,18,34,.94))", boxShadow: `inset 0 0 0 1px rgba(130,180,230,.22), inset 0 3px 0 ${ringOf(i)}` }}
               >
-                <Avatar name={s.name} index={i} size={36} dim={cleared.includes(s.id)} />
-                <span className="w-full truncate text-center text-[13px] font-semibold">{s.name.split(" ")[0]}</span>
-                <span className="label !text-[8.5px]" style={{ color: cleared.includes(s.id) ? "#B6F36A" : undefined }}>
-                  {state}
+                <Avatar name={x.name} index={i} size={42} dim={cleared.includes(x.id)} />
+                <span className="w-full truncate text-[15px] font-bold leading-tight">{x.name}</span>
+                <span className="line-clamp-1 w-full text-[12px] text-mist">{x.role}</span>
+                <span className="label !text-[9px]" style={{ color: st.color }}>
+                  {st.text}
                 </span>
               </button>
             );
           })}
         </div>
 
-        {/* The map: tap a suspect or a glowing spot and you walk there. */}
-        <div className="relative mt-3 min-h-[150px] flex-1 overflow-hidden rounded-[14px]" style={{ background: "rgba(8,13,26,.72)", boxShadow: "inset 0 0 0 1px rgba(130,180,230,.18)" }}>
-          {ROOMS.map((label, r) => (
-            <div
-              key={label}
-              className="absolute rounded-[10px]"
-              style={{
-                left: `calc(${roomBox(r).left}% + 5px)`,
-                top: `calc(${roomBox(r).top}% + 5px)`,
-                width: "calc(50% - 10px)",
-                height: "calc(50% - 10px)",
-                background: "linear-gradient(180deg, rgba(30,42,70,.55), rgba(14,20,38,.6))",
-                boxShadow: "inset 0 0 0 1px rgba(130,180,230,.16)",
-              }}
-            >
-              <span className="label absolute left-2 top-1.5 !text-[8.5px] !text-slate">{label}</span>
-            </div>
-          ))}
-          {view.suspects.map((s, i) => {
-            const p = suspectPos(s.room);
-            return (
-              <button
-                key={s.id}
-                type="button"
-                aria-label={`Walk to ${s.name}`}
-                onClick={() => goTo(s.id)}
-                className="tap absolute flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-0 text-[11px] font-bold text-snow"
-                style={{ left: `${p.x + 22}%`, top: `${p.y + 12}%`, background: "#101a30", boxShadow: `inset 0 0 0 1.5px ${ringOf(i)}` }}
-              >
-                {s.name[0]}
-              </button>
-            );
-          })}
-          {view.spots.map((spot) => {
-            const p = spotPos(spot.room);
-            const done = seenSpots.includes(spot.id);
-            return (
-              <button
-                key={spot.id}
-                type="button"
-                aria-label={done ? `${spot.label}, inspected` : `Inspect ${spot.label}`}
-                onClick={() => inspect(spot)}
-                className="tap absolute flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-0 bg-transparent"
-                style={{ left: `${p.x}%`, top: `${p.y}%` }}
-              >
-                {!done && <span className="absolute h-4 w-4 rounded-full" style={{ boxShadow: "0 0 0 1.5px #5FDDF7", animation: "ping 1.6s ease-out infinite" }} />}
-                <span
-                  className="h-3.5 w-3.5 rounded-full"
-                  style={done ? { boxShadow: "inset 0 0 0 1.5px rgba(174,182,200,.45)" } : { background: "#5FDDF7", boxShadow: "0 0 12px #5FDDF7" }}
-                />
-              </button>
-            );
-          })}
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white"
-            style={{ left: `${me.x}%`, top: `${me.y}%`, boxShadow: "0 0 0 4px rgba(255,255,255,.18), 0 0 18px #fff", transition: "left 420ms cubic-bezier(.3,1.1,.4,1), top 420ms cubic-bezier(.3,1.1,.4,1)" }}
-          />
-        </div>
-
-        <div className={`panel mt-3 shrink-0 p-3.5 ${shaken ? "shake" : ""}`}>
-          <div className="flex items-start justify-between gap-3">
-            <span className="label text-snow">
-              Questioning {suspect.name.split(" ")[0]} · {suspect.role}
-            </span>
-            <span className="label shrink-0 text-right" style={{ color: cracks ? "#ff8098" : undefined }}>
-              Contradictions {cracks} / 2
-            </span>
-          </div>
-          <div className="mt-2.5 flex min-h-[64px] gap-2.5">
-            <Avatar name={suspect.name} index={idx} size={32} />
-            <div className="min-w-0 flex-1">
-              {busy ? (
-                <p className="blink m-0 text-[14px] text-mist">{suspect.name.split(" ")[0]} is thinking</p>
-              ) : last ? (
-                <>
-                  {asked && <p className="label m-0 mb-1 normal-case tracking-normal !text-[11px]">You: {asked.text.slice(0, 70)}</p>}
-                  <p key={last.text} className="rise m-0 text-[14.5px] leading-snug">
-                    {last.text}
-                  </p>
-                </>
-              ) : (
-                <p className="m-0 text-[14px] leading-snug text-mist">
-                  “{suspect.public_alibi}” Ask, press, then confront them with evidence.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-3 grid shrink-0 grid-cols-3 gap-2">
-          <Action title="Ask" sub="1 action" disabled={busy || movesLeft < 1} onClick={() => setSheet("ask")} />
-          <Action title="Press" sub="2 actions" disabled={busy || movesLeft < 2} onClick={() => act("press")} />
-          <Action
-            title="Confront"
-            sub={clues.length ? "1 action" : "Needs a clue"}
-            disabled={busy || movesLeft < 1 || clues.length === 0}
-            onClick={() => setSheet("confront")}
-          />
-        </div>
-        <div className="mt-2 grid shrink-0 grid-cols-[1fr_1.4fr] gap-2">
-          <button type="button" className="btn btn-glass tap !min-h-[50px] !text-[15px]" onClick={() => setSheet("file")}>
-            Case file · {clues.length}
+        <div className="mt-3 grid shrink-0 grid-cols-[1fr_1.4fr] gap-2">
+          <button type="button" className="btn btn-glass tap !min-h-[54px] !text-[15px]" onClick={() => setSheet("file")}>
+            My clues · {clues.length}
           </button>
-          <button type="button" className="btn btn-danger tap !min-h-[50px] !text-[15px]" onClick={() => { setToast(null); setStage("accuse"); }}>
-            Accuse
+          <button type="button" className="btn btn-danger tap !min-h-[54px] !text-[15px]" onClick={() => { setToast(null); setStage("accuse"); }}>
+            I know who did it
             <Arrow />
           </button>
         </div>
 
         {toast && (
-          <div className="panel rise pointer-events-none absolute inset-x-4 top-[68px] z-20 p-3.5" style={{ boxShadow: "inset 0 0 0 1.5px #5FDDF7, 0 12px 40px rgba(0,0,0,.6)" }}>
+          <div className="panel rise pointer-events-none absolute inset-x-4 top-[68px] z-40 p-3.5" style={{ boxShadow: "inset 0 0 0 1.5px #5FDDF7, 0 12px 40px rgba(0,0,0,.6)" }}>
             <p className="eyebrow m-0">{toast.title}</p>
             <p className="m-0 mt-1 text-[14.5px] leading-snug">{toast.text}</p>
           </div>
         )}
 
-        {sheet === "ask" && (
-          <div className="scrim" role="dialog" aria-label="Ask a question">
-            <button type="button" aria-label="Close" className="flex-1 border-0 bg-transparent" onClick={() => setSheet(null)} />
-            <div className="sheet flex flex-col gap-3 p-5 pb-[max(20px,env(safe-area-inset-bottom))]">
-              <span className="display text-[22px]">Ask {suspect.name.split(" ")[0]}</span>
-              <div className="grid grid-cols-2 gap-2">
-                {QUESTIONS.map((q) => (
-                  <button key={q} type="button" className="chip tap !min-h-12 !text-[13.5px]" onClick={() => act("ask", { message: q })}>
-                    {q}
-                  </button>
-                ))}
+        {/* Searching the scene: three things to turn over. */}
+        {sheet === "scene" && (
+          <div className="scrim !justify-center px-5" role="dialog" aria-label="The scene">
+            <button type="button" aria-label="Close" className="absolute inset-0 border-0 bg-transparent" onClick={() => setSheet(null)} />
+            <div className="rise relative flex max-h-[86%] flex-col gap-3 overflow-y-auto">
+              <div className="panel p-5">
+                <p className="eyebrow m-0" style={{ color: "#B6F36A" }}>The scene</p>
+                <p className="m-0 mt-1 text-[14px] text-mist">Tap each one to look closer. Searching is free.</p>
+                <div className="mt-3 flex flex-col gap-2">
+                  {view.spots.map((spot, i) => {
+                    const done = seenSpots.includes(spot.id);
+                    return done ? (
+                      <div key={spot.id} className="rise rounded-[12px] bg-black/30 px-3.5 py-2.5">
+                        <p className="label m-0" style={{ color: "#B6F36A" }}>{spot.id === "scene" ? "What happened here" : "Evidence"}</p>
+                        <p className="m-0 mt-1 text-[15px] leading-snug">{spot.text}</p>
+                      </div>
+                    ) : (
+                      <button key={spot.id} type="button" className="chip tap !min-h-[52px] text-left" onClick={() => inspect(spot)}>
+                        {spot.id === "scene" ? "Look around the room" : `Something odd, no. ${i}`} · tap to inspect
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <form
-                className="flex gap-2"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (draft.trim()) act("ask", { message: draft });
-                }}
-              >
-                <input className="field" placeholder="Or ask your own question" value={draft} onChange={(e) => setDraft(e.target.value)} />
-                <button type="button" aria-label="Ask by voice" onClick={listen} className="btn btn-glass tap !w-14 shrink-0 !min-h-[52px]" style={listening ? { boxShadow: "inset 0 0 0 1.5px #F0385A" } : undefined}>
-                  <Mic />
-                </button>
-              </form>
-              <button type="button" className="btn btn-primary tap" disabled={!draft.trim()} onClick={() => act("ask", { message: draft })}>
-                Ask · 1 action
+              <button type="button" className="btn btn-primary tap" onClick={() => setSheet(null)}>
+                Back to the suspects
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Questioning one suspect. */}
+        {sheet === "suspect" && (
+          <div className="scrim !justify-center px-5" role="dialog" aria-label={`Questioning ${suspect.name}`}>
+            <button type="button" aria-label="Close" className="absolute inset-0 border-0 bg-transparent" onClick={() => setSheet(null)} />
+            <div className="rise relative flex max-h-[90%] flex-col gap-3 overflow-y-auto">
+              <div className={`panel p-4 ${shaken ? "shake" : ""}`}>
+                <div className="flex items-center gap-3">
+                  <Avatar name={suspect.name} index={idx} size={48} />
+                  <span className="min-w-0">
+                    <span className="display block truncate text-[22px]">{suspect.name}</span>
+                    <span className="label block text-snow">{suspect.role}</span>
+                  </span>
+                </div>
+                <p className="label m-0 mt-3">Their story</p>
+                <p className="m-0 text-[15px] leading-snug">“{suspect.public_alibi}”</p>
+
+                <div className="mt-3 flex flex-col gap-2">
+                  {log.slice(-4).map((m, i) => (
+                    <p key={i} className={`m-0 rounded-[12px] px-3 py-2 text-[14.5px] leading-snug ${m.from === "you" ? "ml-8 bg-cyan/15 text-right" : "mr-4 bg-black/30"}`}>
+                      {m.text}
+                    </p>
+                  ))}
+                  {busy && <p className="blink m-0 text-[14px] text-mist">{suspect.name.split(" ")[0]} is thinking</p>}
+                </div>
+
+                <p className="label m-0 mt-4 text-snow">
+                  {movesLeft > 0 ? `Ask a question · 1 move each · ${movesLeft} left` : "No moves left"}
+                </p>
+                <div className="mt-2 grid grid-cols-1 gap-1.5">
+                  {QUESTIONS.slice(0, 3).map((q) => (
+                    <button key={q} type="button" className="chip tap !min-h-11 !text-[14px]" disabled={busy || movesLeft < 1} onClick={() => act("ask", { message: q })}>
+                      {q}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-1.5">
+                  <button type="button" className="btn btn-glass tap !min-h-12 flex-col !gap-0 !text-[14px]" disabled={busy || movesLeft < 2} onClick={() => act("press")}>
+                    Push harder
+                    <span className="label !text-[9px]">2 moves · they may crack</span>
+                  </button>
+                  <button type="button" className="btn btn-glass tap !min-h-12 flex-col !gap-0 !text-[14px]" disabled={busy || movesLeft < 1 || clues.length === 0} onClick={() => setSheet("confront")}>
+                    Show them evidence
+                    <span className="label !text-[9px]">{clues.length ? "1 move" : "find a clue first"}</span>
+                  </button>
+                </div>
+              </div>
+              <button type="button" className="btn btn-primary tap" onClick={() => setSheet(null)}>
+                Back to the suspects
               </button>
             </div>
           </div>
         )}
 
         {sheet === "confront" && (
-          <div className="scrim" role="dialog" aria-label="Confront with evidence">
-            <button type="button" aria-label="Close" className="flex-1 border-0 bg-transparent" onClick={() => setSheet(null)} />
+          <div className="scrim" role="dialog" aria-label="Show them evidence">
+            <button type="button" aria-label="Close" className="flex-1 border-0 bg-transparent" onClick={() => setSheet("suspect")} />
             <div className="sheet flex max-h-[78%] flex-col gap-3 p-5 pb-[max(20px,env(safe-area-inset-bottom))]">
-              <span className="display text-[22px]">Confront {suspect.name.split(" ")[0]} with</span>
+              <span className="display text-[22px]">Show {suspect.name.split(" ")[0]} which clue?</span>
               <div className="flex flex-col gap-2 overflow-y-auto">
                 {clues.map((c) => (
                   <button
                     key={c.id}
                     type="button"
                     className="panel tap border-0 p-3 text-left text-snow"
-                    onClick={() => act("confront", { clueId: c.id })}
+                    onClick={() => {
+                      setSheet("suspect");
+                      void act("confront", { clueId: c.id });
+                    }}
                   >
                     <span className="block text-[14px] leading-snug">{c.text}</span>
                     <span className="label mt-1 block">{c.from}</span>
@@ -626,25 +606,25 @@ export default function Solo() {
         )}
 
         {sheet === "file" && (
-          <div className="scrim" role="dialog" aria-label="Case file">
+          <div className="scrim" role="dialog" aria-label="My clues">
             <button type="button" aria-label="Close" className="flex-1 border-0 bg-transparent" onClick={() => setSheet(null)} />
             <div className="sheet flex max-h-[82%] flex-col gap-3 p-5 pb-[max(20px,env(safe-area-inset-bottom))]">
               <div>
-                <span className="eyebrow">Case file {fileNo}</span>
+                <span className="eyebrow">My clues</span>
                 <p className="display m-0 mt-1 text-[22px]">{view.title}</p>
               </div>
               <div className="flex flex-col gap-2 overflow-y-auto">
-                {clues.length === 0 && <p className="m-0 text-mist">No clues yet. Question the suspects and inspect the glowing spots.</p>}
+                {clues.length === 0 && <p className="m-0 text-mist">Nothing yet. Search the scene and question the suspects.</p>}
                 {clues.map((c) => (
                   <div key={c.id} className="panel p-3">
                     <span className="block text-[14px] leading-snug">{c.text}</span>
                     <span className="label mt-1 block">{c.from}</span>
                   </div>
                 ))}
-                <p className="label m-0 mt-1 normal-case tracking-normal">Not every clue points at the real culprit.</p>
+                <p className="label m-0 mt-1 normal-case tracking-normal">Careful: not every clue points at the real culprit.</p>
               </div>
               <button type="button" className="btn btn-glass tap" onClick={() => setSheet(null)}>
-                Back to the floor
+                Close
               </button>
             </div>
           </div>

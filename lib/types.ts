@@ -80,6 +80,7 @@ export interface SoloCaseView {
   setting: string;
   crime: string;
   intro: string;
+  goal: string; // one line: what the player has to work out
   facts?: CaseFacts;
   suspects: PublicSuspect[];
   totalClues: number; // 5 (3 true + 2 red herrings; the player must judge which matter)
