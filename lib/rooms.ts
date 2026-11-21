@@ -677,14 +677,16 @@ async function botTricks(room: RoomRow, players: PlayerRow[], discussSec: number
   const save = (next: NonNullable<RoomSettings["fx"]>) =>
     store().updateRoomIf(room.code, "discuss", { settings: { ...room.settings, fx: next } });
   const plantId = `bot-${bot.id}`;
-  if (done >= 0.3 && !fx.planted.some((p) => p.id === plantId)) {
+  // Not the same trick every round: frame someone, cut the lights, or both.
+  const mode = seed % 3; // 0 frame · 1 lights · 2 both
+  if (mode !== 1 && done >= 0.3 && !fx.planted.some((p) => p.id === plantId)) {
     const target = humans[seed % humans.length];
     const where = (file.facts?.where ?? "the room").replace(/\.$/, "");
     const text = PLANT_LINES[seed % PLANT_LINES.length](target.name.split(" ")[0], where);
     await save({ ...fx, planted: [...fx.planted, { id: plantId, text, byId: bot.id, targetId: target.id, at: new Date().toISOString() }] });
     return true;
   }
-  if (done >= 0.6 && !fx.blackoutBy) {
+  if (mode !== 0 && done >= 0.6 && !fx.blackoutBy) {
     await save({ ...fx, blackoutUntil: inSeconds(BLACKOUT_SECONDS), blackoutBy: bot.id, destroyed: seed % 2 });
     return true;
   }

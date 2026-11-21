@@ -621,8 +621,21 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
       <div className="mt-1">
         <Timer seconds={secondsLeft ?? 0} total={total} label="Discussion" sub="Talk it out loud" />
       </div>
+      {/* The crime, always in view: what, when and where. */}
+      <button
+        type="button"
+        onClick={() => setOpen("case")}
+        className="tap mt-3 w-full rounded-[14px] border-0 px-3.5 py-2.5 text-left text-snow"
+        style={{ background: "rgba(95,221,247,.08)", boxShadow: "inset 0 0 0 1px rgba(95,221,247,.28)" }}
+      >
+        <span className="block text-[15px] font-semibold leading-snug">{room.case?.facts?.what ?? room.case?.crime}</span>
+        <span className="mt-0.5 block text-[13.5px] leading-snug text-mist">
+          {room.case?.facts?.when ? <><span className="text-cyan">When:</span> {room.case.facts.when} · </> : null}
+          <span className="text-cyan">Where:</span> {room.case?.facts?.where ?? room.case?.setting}
+        </span>
+      </button>
       {card?.story && (
-        <p className="m-0 mt-3 truncate text-[14px] text-mist">
+        <p className="m-0 mt-2 truncate text-[14px] text-mist">
           <span className="text-cyan">Your story:</span> “{card.story}”
         </p>
       )}
