@@ -313,21 +313,9 @@ export default function Solo() {
     return (
       <main key="brief" className="screen cold" onPointerDown={unlockSfx}>
         <TopBar onBack={() => router.push("/")} />
-        {/router|wi-?fi|hackathon|server|techno/i.test(`${view.title} ${view.crime} ${view.setting}`) ? (
-          <div
-            className="mt-2 h-[clamp(96px,17vh,150px)] shrink-0 rounded-[14px] bg-cover bg-center"
-            style={{ backgroundImage: "linear-gradient(180deg, transparent 45%, rgba(6,10,20,.7)), url(/art/briefing.jpg)", boxShadow: "inset 0 0 0 1px rgba(130,180,230,.22)" }}
-            aria-hidden="true"
-          />
-        ) : (
-          <div className="panel relative mt-2 flex h-[clamp(84px,14vh,120px)] shrink-0 items-end justify-between overflow-hidden p-3.5" aria-hidden="true">
-            <span className="display absolute -right-1 -top-5 text-[120px] leading-none text-white/[0.06]">{fileNo}</span>
-            <span className="label text-snow">Scene of the crime</span>
-            <span className="label max-w-[60%] truncate text-right text-cyan">{view.setting}</span>
-            <span className="absolute inset-x-0 top-0 h-px" style={{ background: "linear-gradient(90deg, transparent, #5FDDF7, transparent)", animation: "sweep 3.2s linear infinite" }} />
-          </div>
-        )}
-        <p className="eyebrow mt-4">Case file {fileNo}</p>
+        {/* The case scrolls if it is long; the button below always stays in view. */}
+        <div className="min-h-0 flex-1 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+        <p className="eyebrow mt-2">Case file {fileNo}</p>
         <h1 className="display m-0 mt-1 text-[clamp(24px,7.4vw,30px)] uppercase">{view.title}</h1>
         <p className="m-0 mt-2 text-[15.5px] leading-snug text-[#E3E8F2]">{view.intro}</p>
         {view.facts && (
@@ -352,7 +340,7 @@ export default function Solo() {
         </div>
 
         <p className="label mt-4 text-snow">The four suspects and what they claim</p>
-        <div className="mt-2 grid min-h-[190px] flex-1 auto-rows-fr grid-cols-2 gap-2.5">
+        <div className="mt-2 grid grid-cols-2 gap-2.5 pb-1">
           {view.suspects.map((s, i) => (
             <div
               key={s.id}
@@ -366,7 +354,8 @@ export default function Solo() {
           ))}
         </div>
 
-        <p className="label mb-3 mt-4 text-center">
+        </div>
+        <p className="label mb-2.5 mt-3 text-center">
           {view.difficulty} · {view.actions} moves · {Math.floor(view.durationSec / 60)}:{String(view.durationSec % 60).padStart(2, "0")} on the clock
         </p>
         <button
