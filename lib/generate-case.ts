@@ -51,6 +51,7 @@ const CaseZ = z.object({
   ending_escaped: str,
   roast: str,
   hot_seat: z.object({ player_id: str, question: str }).optional(),
+  facts: z.object({ what: str, when: str, where: str }).optional(),
 });
 
 /**
@@ -143,6 +144,8 @@ RULES
 - REALISM: this must read like a real case file, not a joke. Choose a serious, high-stakes, non-violent crime: a jewel or art theft, a swapped forgery, a leaked exam paper or tender bid, stolen source code or client data, a wiped server, embezzlement, a sabotaged machine or race, a doctored document, blackmail, an inside job. Never a stolen snack or sweet. Nobody is hurt or killed.
 - Give it real-world texture: exact clock times, a rupee value or what is at stake, named rooms, and forensic-style evidence (CCTV timestamps, access-card logs, phone records, fingerprints, transaction IDs, a torn receipt, tyre marks, metadata).
 - Suspects are believable adults with real jobs and real motives (debt, a passed-over promotion, a rival's offer, a cover-up). Titles are short and sound like a case file. Vary them: do not always use the word "Heist" (e.g. "The Camac Street Switch", "Lot 47", "Night Shift at Gate 3").
+- "facts" states the case in three short plain lines a child could follow: "what" was taken or done (under 10 words), "when" (a time window), "where" (the exact spot).
+- CLARITY: one crime, one moment, one place. Every clue is a single plain sentence under 18 words. No jargon.
 - Decide the culprit, motive, method and timeline FIRST. Then write everything else to be consistent with them.
 - "crime_verb" finishes the sentence "Find who ..." in under 8 words, e.g. "swapped the necklace for a fake".
 - "alibi_hole" is the one concrete, checkable fact that breaks the culprit's public_alibi.
@@ -184,7 +187,7 @@ function soloPrompt(setting: string, tone: Tone, culprit: string, names: string[
   return {
     system: `You are a crime writer designing airtight, realistic case files for a 3-minute detective game. ${toneGuide(tone)}
 Return ONE JSON object with exactly these keys:
-{"title","setting","crime","crime_verb","intro",
+{"title","setting","crime","crime_verb","intro","facts":{"what","when","where"},
  "suspects":[{"id":"s1","name","role","persona","speaking_style","public_alibi","innocent_secret"} x4 with ids s1,s2,s3,s4],
  "culprit_id","motive","method","timeline":[4-6 short beats with clock times],
  "clues":[{"id":"c1","text","held_by","points_to","is_red_herring"} x5 with ids c1..c5],
@@ -214,7 +217,7 @@ function roomPrompt(
   return {
     system: `You are a crime writer designing airtight, realistic case files for a party game where REAL FRIENDS are the suspects and argue out loud for 2 minutes. ${toneGuide(tone)}
 Return ONE JSON object with exactly these keys:
-{"title","setting","crime","crime_verb","intro",
+{"title","setting","crime","crime_verb","intro","facts":{"what","when","where"},
  "suspects":[{"id","name","role","persona","speaking_style","public_alibi","innocent_secret","private_clues":[2 strings]} one per player, using the EXACT ids and names given],
  "culprit_id","motive","method","timeline":[4-6 short beats with clock times],
  "clues":[],
@@ -319,11 +322,19 @@ function fallbackFor(players?: { id: string; name: string }[], culpritAmong?: st
     const other = players.filter(
       (x) => x.id !== p.id && x.id !== culprit.id && (!culpritAmong || culpritAmong.includes(x.id)),
     )[0];
+    // Spread the three real clues across the innocents, and give each a
+    // different second observation so no two cards read the same.
+    const hunches = [
+      (n: string) => `${n} left the room for a few minutes right around then.`,
+      (n: string) => `${n} was very keen to change the subject afterwards.`,
+      (n: string) => `${n} kept checking their phone once it was discovered.`,
+      (n: string) => `${n} knew about it before anyone had announced it.`,
+    ];
     const clues = [
-      `I noticed: ${truth[i % truth.length]}`,
-      other
-        ? `I also saw ${other.name} acting a bit odd, but it might be nothing.`
-        : `I noticed: ${truth[(i + 1) % truth.length]}`,
+      truth[i % truth.length],
+      i < truth.length - 1 || !other
+        ? truth[(i + 1) % truth.length]
+        : hunches[i % hunches.length](other.name),
     ];
     i++;
     return { ...tpl, id: p.id, name: p.name, private_clues: clues };

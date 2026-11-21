@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface VoteEntry {
   voterName: string;
@@ -8,7 +8,7 @@ export interface VoteEntry {
 }
 
 export interface ShareCardProps {
-  headline: string;
+  headline: string; // e.g. "Riya Sen caught red-handed"
   caseTitle: string;
   roast: string;
   caught: boolean;
@@ -16,31 +16,46 @@ export interface ShareCardProps {
   siteUrl?: string;
 }
 
-function wrapText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number
-): string[] {
-  const words = text.trim().split(/\s+/);
-  const lines: string[] = [];
-  let currentLine = "";
+const W = 1080;
+const H = 1920;
+const DISPLAY = '"Space Grotesk", "Inter", system-ui, sans-serif';
+const BODY = '"Inter", system-ui, sans-serif';
+const MONO = '"JetBrains Mono", ui-monospace, monospace';
 
-  for (const word of words) {
-    const testLine = currentLine ? `${currentLine} ${word}` : word;
-    const { width } = ctx.measureText(testLine);
-    if (width > maxWidth && currentLine) {
-      lines.push(currentLine);
-      currentLine = word;
-    } else {
-      currentLine = testLine;
-    }
+function loadImage(src: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const lines: string[] = [];
+  let line = "";
+  for (const word of text.trim().split(/\s+/)) {
+    const test = line ? `${line} ${word}` : word;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else line = test;
   }
-  if (currentLine) {
-    lines.push(currentLine);
-  }
+  if (line) lines.push(line);
   return lines;
 }
 
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/** A 1080x1920 story card in the game's own look, ready for Instagram or Snapchat. */
 export default function ShareCard({
   headline,
   caseTitle,
@@ -50,355 +65,214 @@ export default function ShareCard({
   siteUrl = "playkaun.vercel.app",
 }: ShareCardProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [dataUrl, setDataUrl] = useState<string>("");
+  const [dataUrl, setDataUrl] = useState("");
   const [sharing, setSharing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    (async () => {
+      try {
+        await document.fonts.ready;
+      } catch {}
+      const [scene, cube] = await Promise.all([loadImage("/art/scene.jpg"), loadImage("/art/cube.png")]);
+      const canvas = canvasRef.current;
+      if (cancelled || !canvas) return;
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      const accent = caught ? "#F0385A" : "#A78BFA";
+      const M = 84;
 
-    async function renderNewspaper() {
-      if (typeof document !== "undefined" && "fonts" in document) {
-        try {
-          await document.fonts.ready;
-        } catch {
-          // Proceed even if font readiness rejects
+      // Background: the scene photo, darkened, with two colour washes.
+      ctx.fillStyle = "#060A14";
+      ctx.fillRect(0, 0, W, H);
+      if (scene) {
+        const s = Math.max(W / scene.width, H / scene.height);
+        ctx.globalAlpha = 0.55;
+        ctx.drawImage(scene, (W - scene.width * s) / 2, (H - scene.height * s) / 2, scene.width * s, scene.height * s);
+        ctx.globalAlpha = 1;
+      }
+      const shade = ctx.createLinearGradient(0, 0, 0, H);
+      shade.addColorStop(0, "rgba(6,10,20,0.55)");
+      shade.addColorStop(0.5, "rgba(6,10,20,0.86)");
+      shade.addColorStop(1, "rgba(6,10,20,0.6)");
+      ctx.fillStyle = shade;
+      ctx.fillRect(0, 0, W, H);
+      for (const [x, y, c] of [
+        [W * 0.15, H * 0.12, "rgba(95,221,247,0.22)"],
+        [W * 0.9, H * 0.78, caught ? "rgba(240,56,90,0.28)" : "rgba(167,139,250,0.28)"],
+      ] as const) {
+        const g = ctx.createRadialGradient(x, y, 0, x, y, 760);
+        g.addColorStop(0, c);
+        g.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      // Wordmark and cube.
+      ctx.textBaseline = "alphabetic";
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#F4F6FA";
+      ctx.font = `700 54px ${DISPLAY}`;
+      ctx.fillText("KAUN?", M, 150);
+      ctx.textAlign = "right";
+      ctx.font = `500 26px ${MONO}`;
+      ctx.fillStyle = "#AEB6C8";
+      ctx.fillText("CASE FILE", W - M, 146);
+      if (cube) ctx.drawImage(cube, W / 2 - 210, 200, 420, 404);
+
+      // Case title.
+      let y = 700;
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#5FDDF7";
+      ctx.font = `600 30px ${BODY}`;
+      ctx.fillText(caseTitle.toUpperCase().split("").join(" "), M, y);
+
+      // Verdict tag.
+      y += 44;
+      const tag = caught ? "CULPRIT CAUGHT" : "CULPRIT ESCAPED";
+      ctx.font = `700 40px ${BODY}`;
+      const tagW = ctx.measureText(tag).width + 64;
+      ctx.save();
+      ctx.translate(M, y + 44);
+      ctx.rotate((-3 * Math.PI) / 180);
+      ctx.fillStyle = accent;
+      roundRect(ctx, 0, -46, tagW, 82, 16);
+      ctx.fill();
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillText(tag, 32, 12);
+      ctx.restore();
+
+      // Headline, big.
+      y += 190;
+      let size = 118;
+      ctx.font = `700 ${size}px ${DISPLAY}`;
+      let lines = wrap(ctx, headline, W - M * 2);
+      while (lines.length > 3 && size > 70) {
+        size -= 10;
+        ctx.font = `700 ${size}px ${DISPLAY}`;
+        lines = wrap(ctx, headline, W - M * 2);
+      }
+      const metal = ctx.createLinearGradient(0, y - size, 0, y + lines.length * size);
+      metal.addColorStop(0, "#FFFFFF");
+      metal.addColorStop(1, "#B9C2D4");
+      ctx.fillStyle = metal;
+      for (const line of lines.slice(0, 3)) {
+        ctx.fillText(line, M, y);
+        y += size * 1.04;
+      }
+
+      // The detective's closing line.
+      y += 36;
+      ctx.font = `italic 500 42px ${BODY}`;
+      const quote = wrap(ctx, `“${roast.replace(/^["“]|["”]$/g, "")}”`, W - M * 2 - 60).slice(0, 4);
+      const quoteH = quote.length * 58 + 64;
+      ctx.fillStyle = "rgba(20,30,52,0.82)";
+      roundRect(ctx, M, y - 20, W - M * 2, quoteH, 28);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(130,180,230,0.3)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = "#E3E8F2";
+      let qy = y + 46;
+      for (const line of quote) {
+        ctx.fillText(line, M + 32, qy);
+        qy += 58;
+      }
+      y += quoteH + 44;
+
+      // Who accused whom.
+      if (votes.length && y < H - 360) {
+        ctx.font = `500 26px ${MONO}`;
+        ctx.fillStyle = "#AEB6C8";
+        ctx.fillText("WHO ACCUSED WHOM", M, y);
+        y += 54;
+        for (const v of votes.slice(0, Math.max(1, Math.floor((H - 290 - y) / 64)))) {
+          ctx.font = `600 38px ${BODY}`;
+          ctx.fillStyle = "#F4F6FA";
+          ctx.textAlign = "left";
+          ctx.fillText(v.voterName, M, y);
+          ctx.textAlign = "right";
+          ctx.fillStyle = accent;
+          ctx.fillText(`→ ${v.targetName}`, W - M, y);
+          ctx.textAlign = "left";
+          y += 64;
         }
       }
 
-      if (cancelled) return;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const W = 1080;
-      const H = 1920;
-      canvas.width = W;
-      canvas.height = H;
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      // 1. Aged newspaper background (#EFE6D3)
-      ctx.fillStyle = "#EFE6D3";
-      ctx.fillRect(0, 0, W, H);
-
-      // Subtle paper grain / noise
-      const imgData = ctx.getImageData(0, 0, W, H);
-      const pixels = imgData.data;
-      let seed = 42;
-      const nextRand = () => {
-        seed = (seed * 1664525 + 1013904223) % 4294967296;
-        return seed / 4294967296;
-      };
-      for (let i = 0; i < pixels.length; i += 4) {
-        const delta = (nextRand() - 0.5) * 16;
-        pixels[i] = Math.min(255, Math.max(0, pixels[i] + delta));
-        pixels[i + 1] = Math.min(255, Math.max(0, pixels[i + 1] + delta));
-        pixels[i + 2] = Math.min(255, Math.max(0, pixels[i + 2] + delta));
-      }
-      ctx.putImageData(imgData, 0, 0);
-
-      // Subtle vignette border
-      const grad = ctx.createRadialGradient(
-        W / 2,
-        H / 2,
-        W * 0.35,
-        W / 2,
-        H / 2,
-        H * 0.72
-      );
-      grad.addColorStop(0, "rgba(139, 115, 85, 0)");
-      grad.addColorStop(1, "rgba(110, 86, 56, 0.16)");
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, W, H);
-
-      const marginX = 76;
-      const contentW = W - marginX * 2;
-      const ink = "#1A1612";
-      const mutedInk = "#4A4137";
-
-      // Outer double frame
-      ctx.strokeStyle = ink;
-      ctx.lineWidth = 4;
-      ctx.strokeRect(44, 44, W - 88, H - 88);
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(54, 54, W - 108, H - 108);
-
-      // 2. Masthead: THE KAUN? TIMES
-      ctx.fillStyle = ink;
-      ctx.textAlign = "center";
-      ctx.font = '900 84px Georgia, "Times New Roman", serif';
-      ctx.fillText("THE KAUN? TIMES", W / 2, 165);
-
-      // Double horizontal rule under masthead
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(marginX, 195);
-      ctx.lineTo(W - marginX, 195);
-      ctx.stroke();
-
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(marginX, 204);
-      ctx.lineTo(W - marginX, 204);
-      ctx.stroke();
-
-      // 3. Date line
-      ctx.font = '600 26px Georgia, "Times New Roman", serif';
-      ctx.fillStyle = mutedInk;
-      ctx.textAlign = "left";
-      ctx.fillText("Kolkata · Late City Edition", marginX, 244);
-
-      ctx.textAlign = "right";
-      ctx.fillText("PRICE: 1 ROSOGOLLA", W - marginX, 244);
-
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = ink;
-      ctx.beginPath();
-      ctx.moveTo(marginX, 264);
-      ctx.lineTo(W - marginX, 264);
-      ctx.stroke();
-
-      // Case kicker pill / subhead
-      let y = 324;
-      ctx.textAlign = "center";
-      ctx.fillStyle = mutedInk;
-      ctx.font = '700 28px Georgia, "Times New Roman", serif';
-      ctx.fillText(`CASE FILE: ${caseTitle.toUpperCase()}`, W / 2, y);
-      y += 78;
-
-      // 4. Huge Headline
-      ctx.fillStyle = ink;
-      ctx.textAlign = "center";
-      const headlineFontSize = headline.length > 52 ? 64 : 76;
-      ctx.font = `900 ${headlineFontSize}px Georgia, "Times New Roman", serif`;
-      const headlineLines = wrapText(ctx, headline.toUpperCase(), contentW);
-      for (const line of headlineLines.slice(0, 4)) {
-        ctx.fillText(line, W / 2, y);
-        y += headlineFontSize * 1.14;
-      }
-
-      // Divider rule below headline
-      y += 16;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(marginX, y);
-      ctx.lineTo(W - marginX, y);
-      ctx.stroke();
-
-      // 5. Rubber Stamp rotated -8 degrees
-      y += 125;
-      ctx.save();
-      ctx.translate(W / 2, y);
-      ctx.rotate((-8 * Math.PI) / 180);
-
-      const stampText = caught ? "CASE CLOSED" : "CULPRIT ESCAPED";
-      const stampColor = caught ? "#B81D13" : "#181818";
-
-      ctx.font = '900 54px "Courier New", Courier, monospace';
-      const stampMetrics = ctx.measureText(stampText);
-      const boxW = stampMetrics.width + 68;
-      const boxH = 96;
-
-      // Faint ink fill inside stamp
-      ctx.fillStyle = caught
-        ? "rgba(184, 29, 19, 0.07)"
-        : "rgba(24, 24, 24, 0.07)";
-      ctx.fillRect(-boxW / 2, -boxH / 2, boxW, boxH);
-
-      // Thick double stamp border
-      ctx.strokeStyle = stampColor;
-      ctx.lineWidth = 7;
-      ctx.strokeRect(-boxW / 2, -boxH / 2, boxW, boxH);
-      ctx.lineWidth = 2.5;
-      ctx.strokeRect(-boxW / 2 + 8, -boxH / 2 + 8, boxW - 16, boxH - 16);
-
-      ctx.fillStyle = stampColor;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(stampText, 0, 3);
-      ctx.restore();
-
-      // 6. The Roast in italic quotes
-      y += 128;
-      ctx.fillStyle = "rgba(26, 22, 18, 0.05)";
-      const roastFontSize = 38;
-      ctx.font = `italic 600 ${roastFontSize}px Georgia, "Times New Roman", serif`;
-      const quotedRoast = `“${roast.replace(/^["“]|["”]$/g, "")}”`;
-      const roastLines = wrapText(ctx, quotedRoast, contentW - 64);
-      const roastBoxH = roastLines.length * (roastFontSize * 1.35) + 56;
-
-      ctx.fillRect(marginX, y - 36, contentW, roastBoxH);
-      ctx.strokeStyle = ink;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(marginX, y - 36, contentW, roastBoxH);
-
-      ctx.fillStyle = ink;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "alphabetic";
-      let roastY = y + 14;
-      for (const line of roastLines) {
-        ctx.fillText(line, W / 2, roastY);
-        roastY += roastFontSize * 1.35;
-      }
-
-      y = y - 36 + roastBoxH + 64;
-
-      // 7. "WHO BLAMED WHOM" section
-      ctx.fillStyle = ink;
-      ctx.textAlign = "left";
-      ctx.font = '900 32px Georgia, "Times New Roman", serif';
-      ctx.fillText("WHO BLAMED WHOM", marginX, y);
-
+      // Footer.
+      ctx.strokeStyle = "rgba(255,255,255,0.14)";
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(marginX, y + 16);
-      ctx.lineTo(W - marginX, y + 16);
+      ctx.moveTo(M, H - 220);
+      ctx.lineTo(W - M, H - 220);
       ctx.stroke();
-
-      y += 64;
-      const displayVotes =
-        votes.length > 0
-          ? votes
-          : [{ voterName: "Everyone", targetName: "Each Other" }];
-
-      const maxVotes = Math.min(displayVotes.length, 6);
-      for (let i = 0; i < maxVotes; i++) {
-        const v = displayVotes[i];
-        ctx.font = '700 34px Georgia, "Times New Roman", serif';
-        ctx.fillStyle = ink;
-        ctx.textAlign = "left";
-        ctx.fillText(v.voterName, marginX + 12, y);
-
-        ctx.font = 'italic 30px Georgia, "Times New Roman", serif';
-        ctx.fillStyle = mutedInk;
-        ctx.textAlign = "center";
-        ctx.fillText("accused", W / 2, y);
-
-        ctx.font = '900 34px Georgia, "Times New Roman", serif';
-        ctx.fillStyle = ink;
-        ctx.textAlign = "right";
-        ctx.fillText(v.targetName, W - marginX - 12, y);
-
-        // Dotted baseline guide
-        ctx.save();
-        ctx.setLineDash([4, 8]);
-        ctx.strokeStyle = "rgba(26, 22, 18, 0.35)";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(marginX + 12, y + 18);
-        ctx.lineTo(W - marginX - 12, y + 18);
-        ctx.stroke();
-        ctx.restore();
-
-        y += 66;
-      }
-
-      // 8. Footer: Play at {siteUrl}
-      const footerY = H - 118;
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = ink;
-      ctx.beginPath();
-      ctx.moveTo(marginX, footerY - 52);
-      ctx.lineTo(W - marginX, footerY - 52);
-      ctx.stroke();
-
-      ctx.fillStyle = ink;
-      ctx.textAlign = "center";
-      ctx.font = '700 34px "Courier New", Courier, monospace';
-      ctx.fillText(`Play at ${siteUrl}`, W / 2, footerY);
+      ctx.fillStyle = "#F4F6FA";
+      ctx.font = `700 46px ${DISPLAY}`;
+      ctx.fillText("Think you can crack it?", M, H - 142);
+      ctx.fillStyle = "#5FDDF7";
+      ctx.font = `500 34px ${MONO}`;
+      ctx.fillText(siteUrl, M, H - 84);
 
       setDataUrl(canvas.toDataURL("image/png"));
-    }
-
-    renderNewspaper();
+    })();
     return () => {
       cancelled = true;
     };
   }, [headline, caseTitle, roast, caught, votes, siteUrl]);
 
-  const handleDownload = () => {
+  function download() {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const url = dataUrl || canvas.toDataURL("image/png");
     const link = document.createElement("a");
-    link.download = "the-kaun-times.png";
-    link.href = url;
+    link.download = "kaun-case.png";
+    link.href = dataUrl || canvas.toDataURL("image/png");
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
-  };
+    link.remove();
+  }
 
-  const handleShare = async () => {
+  async function share() {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     setSharing(true);
     try {
-      const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob((b) => resolve(b), "image/png")
-      );
-
-      if (blob && typeof navigator !== "undefined" && navigator.share) {
-        const file = new File([blob], "the-kaun-times.png", {
-          type: "image/png",
-        });
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (blob && navigator.share) {
+        const file = new File([blob], "kaun-case.png", { type: "image/png" });
         if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            title: "The Kaun? Times",
-            text: `${headline} — Play at ${siteUrl}`,
-            files: [file],
-          });
+          await navigator.share({ title: "Kaun?", text: `${headline}. Play at ${siteUrl}`, files: [file] });
           return;
         }
       }
-      handleDownload();
+      download();
     } catch (err) {
-      // Ignore user-cancelled share sheets; fallback to download on actual errors
-      if ((err as Error)?.name !== "AbortError") {
-        handleDownload();
-      }
+      if ((err as Error)?.name !== "AbortError") download();
     } finally {
       setSharing(false);
     }
-  };
+  }
 
   return (
-    <div className="flex flex-col items-center gap-4 w-full">
-      {/* Hidden full-resolution 1080x1920 render canvas */}
+    <div className="flex w-full flex-col items-center gap-3">
       <canvas ref={canvasRef} className="hidden" aria-hidden="true" />
-
-      {/* Scaled preview (max-width 320px) */}
-      <div className="w-full max-w-[320px] rounded-md overflow-hidden shadow-xl border border-stone-400 bg-[#EFE6D3]">
+      <div className="w-full max-w-[250px] overflow-hidden rounded-[18px]" style={{ boxShadow: "0 0 0 1px rgba(130,180,230,.3), 0 18px 50px rgba(0,0,0,.6)" }}>
         {dataUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={dataUrl}
-            alt="The Kaun? Times front page"
-            className="w-full h-auto block"
-          />
+          <img src={dataUrl} alt="Your case result" className="block h-auto w-full" />
         ) : (
-          <div className="aspect-[9/16] w-full flex items-center justify-center text-stone-700 font-serif text-sm">
-            Printing front page...
+          <div className="flex aspect-[9/16] w-full items-center justify-center bg-night">
+            <span className="label blink">Printing your case file</span>
           </div>
         )}
       </div>
-
-      {/* Action buttons */}
-      <div className="flex items-center gap-3 w-full max-w-[320px]">
-        <button
-          type="button"
-          onClick={handleDownload}
-          className="flex-1 py-2.5 px-4 rounded-lg bg-stone-900 text-[#EFE6D3] font-semibold text-sm hover:bg-stone-800 active:scale-[0.99] transition cursor-pointer"
-        >
-          Download (PNG)
+      <div className="grid w-full grid-cols-2 gap-2.5">
+        <button type="button" className="btn btn-primary tap !min-h-[52px] !text-[15px]" disabled={sharing || !dataUrl} onClick={share}>
+          {sharing ? "Opening" : "Share to story"}
         </button>
-        <button
-          type="button"
-          onClick={handleShare}
-          disabled={sharing}
-          className="flex-1 py-2.5 px-4 rounded-lg bg-[#B81D13] text-white font-semibold text-sm hover:bg-[#9e1810] active:scale-[0.99] transition disabled:opacity-60 cursor-pointer"
-        >
-          {sharing ? "Sharing..." : "Share"}
+        <button type="button" className="btn btn-glass tap !min-h-[52px] !text-[15px]" disabled={!dataUrl} onClick={download}>
+          Save image
         </button>
       </div>
     </div>

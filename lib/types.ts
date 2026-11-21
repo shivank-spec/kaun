@@ -43,7 +43,15 @@ export interface CaseFile {
   ending_caught: string; // narrator reveal if culprit is caught
   ending_escaped: string; // narrator reveal if an innocent is framed
   roast: string; // one-line roast of the culprit
+  /** The case in three plain facts, for the briefing card. */
+  facts?: CaseFacts;
   hot_seat?: { player_id: string; question: string }; // multiplayer mid-round twist
+}
+
+export interface CaseFacts {
+  what: string; // what was taken or done, e.g. "A 2-carat sapphire necklace"
+  when: string; // e.g. "Between 9:40 and 9:55 pm"
+  where: string; // e.g. "Display case 4, Camac Street showroom"
 }
 
 /* ---------- SOLO: what the browser receives ---------- */
@@ -72,6 +80,7 @@ export interface SoloCaseView {
   setting: string;
   crime: string;
   intro: string;
+  facts?: CaseFacts;
   suspects: PublicSuspect[];
   totalClues: number; // 5 (3 true + 2 red herrings; the player must judge which matter)
   durationSec: number; // 150
@@ -178,10 +187,15 @@ export interface RoomView {
     doubting?: string | null; // who you currently doubt
     votedFor?: string | null;
   } | null;
-  case: { title: string; crime: string; intro: string; setting?: string } | null; // null in lobby
+  case: { title: string; crime: string; intro: string; setting?: string; facts?: CaseFacts } | null; // null in lobby
   reveal: RoomReveal | null; // only in "reveal"
   /** Mid-discussion twist. Non-null for ~15 s: freeze the screen and show it to everyone. */
   hotSeat?: { playerId: string; playerName: string; question: string; endsAt: string } | null;
-  /** What AI bot players "saw". Bots cannot talk, so show these to everyone during play. */
+  /**
+   * Evidence from the AI bots. Bots cannot talk, so what they saw is dropped
+   * into the room one piece at a time during the discussion.
+   */
   botClues?: { from: string; text: string }[];
+  /** How many pieces of bot evidence exist in total this round. */
+  evidenceTotal?: number;
 }

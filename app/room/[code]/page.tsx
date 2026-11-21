@@ -44,6 +44,7 @@ function Room({ code }: { code: string }) {
       vote: (targetId) => run("vote", { targetId }),
       again: () => run("again", {}),
       doubt: (targetId) => run("doubt", { targetId }),
+      skip: () => run("skip", {}),
       home: () => router.push("/"),
     };
   }, [code, mine?.playerId, refresh, router]);

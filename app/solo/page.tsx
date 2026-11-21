@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ShareCard from "@/components/ShareCard";
+import { HowTo, countRound } from "@/components/ui/HowTo";
 import {
   Avatar,
   Loading,
@@ -256,6 +257,7 @@ export default function Solo() {
       const gained = Math.round(v.score / 4) + 40;
       setXp({ gained, total: addXp(gained) });
       setVerdict(v);
+      countRound();
       setStage("verdict");
       if (v.correct) sfx.win();
       else sfx.sting();
@@ -339,8 +341,24 @@ export default function Solo() {
         )}
         <p className="eyebrow mt-4">Case file {fileNo}</p>
         <h1 className="display m-0 mt-1 text-[clamp(24px,7.4vw,30px)] uppercase">{view.title}</h1>
-        <p className="m-0 mt-2 text-[15px] leading-snug text-[#E3E8F2]">{view.crime}</p>
-        <p className="m-0 mt-1.5 text-[13px] leading-snug text-fog">{view.intro}</p>
+        {view.facts ? (
+          <div className="panel mt-2.5 px-3.5 py-1">
+            {(
+              [
+                ["What", view.facts.what],
+                ["When", view.facts.when],
+                ["Where", view.facts.where],
+              ] as const
+            ).map(([k, val]) => (
+              <div key={k} className="flex gap-3 border-t border-white/5 py-2 first:border-0">
+                <span className="label w-12 shrink-0 pt-0.5 text-cyan">{k}</span>
+                <span className="text-[14px] leading-snug">{val}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="m-0 mt-2 text-[15px] leading-snug text-[#E3E8F2]">{view.crime}</p>
+        )}
 
         <p className="label mt-4 text-snow">Suspects · one is lying</p>
         <div className="mt-2 grid min-h-[190px] flex-1 auto-rows-fr grid-cols-2 gap-2.5">
@@ -374,6 +392,7 @@ export default function Solo() {
           Begin Investigation
           <Arrow />
         </button>
+        <HowTo mode="solo" />
       </main>
     );
   }
@@ -638,7 +657,7 @@ export default function Solo() {
         <TopBar onBack={timeUp ? undefined : () => setStage("play")} />
         <h1 className="display m-0 mt-2 text-center text-[clamp(26px,8vw,32px)] uppercase">Who did it?</h1>
         <p className="m-0 mt-1 text-center text-[14.5px] text-mist">
-          {timeUp ? "Time is up. Lock your accusation." : "Lock your accusation. You only get one."}
+          {timeUp ? "Time is up. Tap the one you think did it." : "Tap the one you think did it. You only get one guess."}
         </p>
         <div className="mt-4 grid min-h-[260px] flex-1 auto-rows-fr grid-cols-2 gap-2.5">
           {view.suspects.map((s, i) => {

@@ -55,6 +55,7 @@ export function toSoloView(file: CaseFile, tone: Tone, difficulty: Difficulty = 
     setting: file.setting,
     crime: file.crime,
     intro: file.intro,
+    facts: file.facts,
     suspects: file.suspects.map((s, i) => ({
       id: s.id,
       name: s.name,

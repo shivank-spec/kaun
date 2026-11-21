@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { HowTo, roundsPlayed } from "@/components/ui/HowTo";
 import { sfx, unlockSfx } from "@/components/ui/kit";
 import type { Difficulty, LeaderboardView, Tone } from "@/lib/types";
 
@@ -17,7 +18,8 @@ export default function Home() {
   const [settingId, setSettingId] = useState<SettingId>("kolkata");
   const [custom, setCustom] = useState("");
   const [tone, setTone] = useState<Tone>("desi");
-  const [difficulty, setDifficulty] = useState<Difficulty>("medium");
+  const [difficulty, setDifficulty] = useState<Difficulty>("easy");
+  const [help, setHelp] = useState(false);
   const [code, setCode] = useState(["", "", "", ""]);
   const [sheet, setSheet] = useState<null | "settings" | "name">(null);
   const [name, setName] = useState("");
@@ -39,7 +41,8 @@ export default function Home() {
         if (p.settingId) setSettingId(p.settingId);
         if (p.custom) setCustom(p.custom);
         if (p.tone) setTone(p.tone);
-        if (p.difficulty) setDifficulty(p.difficulty);
+        // New players stay on Easy for their first three rounds.
+        if (p.difficulty && roundsPlayed() >= 3) setDifficulty(p.difficulty);
       } catch {}
     }
     // If this phone was in a game that is still running, offer a way back in.
@@ -121,11 +124,10 @@ export default function Home() {
         <span className="display text-[20px] tracking-[0.02em]">KAUN?</span>
         <button
           type="button"
-          aria-label="Settings"
-          onClick={() => setSheet("settings")}
-          className="tap flex h-11 w-11 items-center justify-end border-0 bg-transparent text-snow"
+          onClick={() => setHelp(true)}
+          className="tap flex h-11 items-center justify-end border-0 bg-transparent text-[14px] font-semibold text-cyan"
         >
-          <Gear size={24} />
+          How to play
         </button>
       </header>
 
@@ -258,6 +260,8 @@ export default function Home() {
           </button>
         </div>
       </div>
+
+      <HowTo mode="solo" open={help} onClose={() => setHelp(false)} />
 
       {sheet === "settings" && (
         <div className="scrim" role="dialog" aria-label="Settings">

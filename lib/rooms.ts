@@ -35,8 +35,8 @@ function timings(settings: RoomSettings) {
   return { ...SECONDS.normal, discuss: DISCUSS_BY_LEVEL[settings.difficulty ?? "medium"] };
 }
 const MIN_HUMANS = 2; // with 2 humans an AI bot fills the third seat
-const MIN_SEATS = 3;
-const BOT_NAMES = ["Inspector Bot", "Havaldar Bot"];
+const MIN_SEATS = 5; // a room always has at least five suspects
+const BOT_NAMES = ["Asha", "Vikram", "Meera", "Kabir", "Zoya"];
 const MAX_PLAYERS = 8;
 const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O
 
@@ -158,12 +158,14 @@ export async function startRoom(
   if (!claimed) return { ok: true };
 
   try {
-    // Fill empty seats with silent AI bots so two people can still play.
+    // Fill empty seats with AI bots so two people can still play a full room.
+    const taken = new Set(players.map((p) => p.name.toLowerCase().split(" ")[0]));
+    const botNames = BOT_NAMES.filter((n) => !taken.has(n.toLowerCase()));
     for (let i = 0; players.length < MIN_SEATS; i++) {
       const bot: PlayerRow = {
         id: crypto.randomUUID(),
         room_code: code,
-        name: BOT_NAMES[i % BOT_NAMES.length],
+        name: botNames[i % botNames.length],
         is_host: false,
         is_bot: true,
         card: null,
@@ -245,6 +247,20 @@ export async function castVote(codeRaw: string, playerId: string, targetId: stri
   if (!players.some((p) => p.id === targetId)) throw new GameError("Unknown player");
   if (targetId === playerId) throw new GameError("You cannot vote for yourself");
   await db.updatePlayer(playerId, { vote: targetId });
+  return { ok: true };
+}
+
+/** The host can cut a phase short once everyone is ready. */
+export async function skipPhase(codeRaw: string, playerId: string) {
+  const code = codeRaw.toUpperCase();
+  const db = store();
+  const room = await db.getRoom(code);
+  if (!room) throw new GameError("No room with that code", 404);
+  const players = await db.listPlayers(code);
+  if (!players.find((p) => p.id === playerId)?.is_host) throw new GameError("Only the host can do that", 403);
+  if (room.status === "briefing" || room.status === "discuss") {
+    await db.updateRoomIf(code, room.status, { phase_ends_at: new Date().toISOString() });
+  }
   return { ok: true };
 }
 
@@ -378,6 +394,21 @@ export async function getRoomView(codeRaw: string, playerId: string | null): Pro
   const showCard = room.status !== "lobby" && room.status !== "generating";
   const f = room.case_file;
   const humans = players.filter((p) => !p.is_bot);
+  // What the bots saw is released one piece at a time while people talk.
+  const evidence = showCard
+    ? players
+        .filter((p) => p.is_bot)
+        .flatMap((p) => (p.card?.clues ?? []).map((text) => ({ from: p.name, text })))
+    : [];
+  let dropped = 0;
+  if (room.status === "discuss" && room.phase_ends_at) {
+    const total = timings(room.settings).discuss * 1000;
+    const elapsed = total - (Date.parse(room.phase_ends_at) - Date.now());
+    // First piece almost at once, the last with about a fifth of the time left.
+    dropped = Math.min(evidence.length, 1 + Math.floor((elapsed / (total * 0.8)) * (evidence.length - 1)));
+  } else if (room.status === "vote" || room.status === "reveal") {
+    dropped = evidence.length;
+  }
   const doubtOf = (id: string) => {
     const voters = humans.filter((p) => p.id !== id);
     if (!voters.length) return 0;
@@ -417,14 +448,10 @@ export async function getRoomView(codeRaw: string, playerId: string | null): Pro
           votedFor: me.vote ?? null,
         }
       : null,
-    case: f && showCard ? { title: f.title, crime: f.crime, intro: f.intro, setting: f.setting } : null,
+    case: f && showCard ? { title: f.title, crime: f.crime, intro: f.intro, setting: f.setting, facts: f.facts } : null,
     reveal: room.status === "reveal" ? room.reveal : null,
     hotSeat: hotSeatNow(room, players),
-    botClues:
-      showCard && room.status !== "reveal"
-        ? players
-            .filter((p) => p.is_bot)
-            .flatMap((p) => (p.card?.clues ?? []).map((text) => ({ from: p.name, text })))
-        : [],
+    botClues: evidence.slice(0, dropped),
+    evidenceTotal: evidence.length,
   };
 }

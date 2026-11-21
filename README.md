@@ -25,7 +25,9 @@ _Link added at submission._
 3. Argue out loud for 100 seconds. Tap a player to mark who you doubt, and everyone's **doubt meter** moves live. Halfway through, the **Hot Seat** freezes every screen and puts one player on the spot with an awkward question.
 4. Everyone votes on their phone. The narrator reveals the truth and roasts the culprit. One tap plays again with a new case.
 
-Two people can play: an AI bot takes the third seat, shares what it "saw" with everyone, and votes.
+A room always has at least five suspects. If fewer friends are playing, AI suspects fill the seats: their evidence drops into the room one piece at a time during the discussion, and they vote.
+
+There are three difficulty levels. New players start on Easy and a three-step "How to play" appears the first time.
 
 ## How it meets the three Play rules
 

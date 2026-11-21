@@ -3,6 +3,7 @@
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useRef, useState } from "react";
 import ShareCard from "@/components/ShareCard";
+import { HowTo, countRound } from "@/components/ui/HowTo";
 import { Avatar, Meter, Timer, TopBar, XpCard, addXp, readXp, ringOf, sfx } from "@/components/ui/kit";
 import { post } from "@/components/room/api";
 import type { Difficulty, PlayerCard, RoomView, Tone } from "@/lib/types";
@@ -15,6 +16,7 @@ export interface RoomActions {
   vote: (targetId: string) => Promise<void>;
   again: () => Promise<void>;
   doubt: (targetId: string | null) => Promise<void>;
+  skip: () => Promise<void>;
   home: () => void;
 }
 
@@ -22,6 +24,11 @@ type Props = { room: RoomView; actions: RoomActions; secondsLeft: number | null 
 
 const indexOf = (room: RoomView, id: string) => Math.max(0, room.players.findIndex((p) => p.id === id));
 const first = (name: string) => name.split(" ")[0];
+/** First name, unless two players share it: then the full name, so nobody is confused. */
+function label(room: RoomView, name: string) {
+  const f = first(name).toLowerCase();
+  return room.players.filter((p) => first(p.name).toLowerCase() === f).length > 1 ? name : first(name);
+}
 
 /* ---------------- join ---------------- */
 
@@ -220,7 +227,7 @@ export function Lobby({ room, actions }: Props) {
       )}
 
       <p className="label mb-2.5 mt-3 text-center text-snow">
-        {error ? error : !enough ? "Need at least 2 players" : humans.length === 2 ? "An AI bot will take the third seat" : "Everyone is ready"}
+        {error ? error : !enough ? "Need at least 2 players" : humans.length < 5 ? `${5 - humans.length} AI ${5 - humans.length === 1 ? "suspect joins" : "suspects join"} to make five` : "Everyone is ready"}
       </p>
       {host ? (
         <button type="button" className="btn btn-primary tap" disabled={!enough || busy} onClick={start}>
@@ -232,6 +239,8 @@ export function Lobby({ room, actions }: Props) {
           <span className="blink">Waiting for {first(hostName)} to start</span>
         </div>
       )}
+
+      <HowTo mode="party" />
 
       {qr && (
         <div className="scrim" role="dialog" aria-label="QR code">
@@ -391,13 +400,27 @@ export function Briefing({ room, secondsLeft }: Props) {
 
 /* ---------------- discussion ---------------- */
 
+/** One row of the case card: a label and a plain fact. */
+function Fact({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex gap-3 border-t border-white/5 py-2.5 first:border-0">
+      <span className="label w-14 shrink-0 pt-0.5 text-cyan">{k}</span>
+      <span className="text-[15px] leading-snug">{v}</span>
+    </div>
+  );
+}
+
 export function Discuss({ room, actions, secondsLeft }: Props) {
-  const [hidden, setHidden] = useState(false);
   const you = room.you;
   const card = you?.card;
   const total = room.phaseTotalSec ?? (room.settings.demo ? 45 : 100);
   const hot = room.hotSeat ?? null;
   const hotLeft = hot ? Math.max(0, Math.ceil((Date.parse(hot.endsAt) - Date.parse(room.serverNow)) / 1000)) : 0;
+  const evidence = room.botClues ?? [];
+  const deck = useRef<HTMLDivElement>(null);
+  const [page, setPage] = useState(0);
+  const [drop, setDrop] = useState<{ from: string; text: string } | null>(null);
+  const seenEvidence = useRef(evidence.length);
   const lastHot = useRef<string | null>(null);
 
   useEffect(() => {
@@ -407,14 +430,34 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
     }
   }, [hot]);
 
+  // A new piece of evidence just landed: show it to everyone.
+  useEffect(() => {
+    if (evidence.length > seenEvidence.current) {
+      const latest = evidence[evidence.length - 1];
+      setDrop(latest);
+      sfx.clue();
+      const t = setTimeout(() => setDrop(null), 4200);
+      seenEvidence.current = evidence.length;
+      return () => clearTimeout(t);
+    }
+  }, [evidence]);
+
+  const others = room.players.filter((p) => p.id !== you?.id);
+  const pages = 3 + others.length;
+  const go = (i: number) => {
+    const el = deck.current;
+    if (el) el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
+  };
+
   return (
     <main className="screen">
       <TopBar />
       <div className="mt-1">
-        <Timer seconds={secondsLeft ?? 0} total={total} label="Discussion" sub="Talk out loud" />
+        <Timer seconds={secondsLeft ?? 0} total={total} label="Discussion" sub={`Evidence ${evidence.length} / ${room.evidenceTotal ?? evidence.length}`} />
       </div>
 
-      <div className="mt-3 grid shrink-0 gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(4, room.players.length)}, minmax(0, 1fr))` }}>
+      {/* Tap a face to mark who you doubt. Everyone's meter moves live. */}
+      <div className="mt-3 grid shrink-0 gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(5, room.players.length)}, minmax(0, 1fr))` }}>
         {room.players.map((p, i) => {
           const mine = p.id === you?.id;
           const doubted = you?.doubting === p.id;
@@ -429,51 +472,111 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
                 sfx.tap();
                 void actions.doubt(doubted ? null : p.id).catch(() => {});
               }}
-              className="tap flex flex-col items-center gap-1 rounded-[12px] border-0 px-1 pb-2 pt-2.5 text-snow disabled:!opacity-100"
+              className="tap flex flex-col items-center gap-1 rounded-[12px] border-0 px-0.5 pb-1.5 pt-2 text-snow disabled:!opacity-100"
               style={{
                 background: "linear-gradient(180deg, rgba(28,40,66,.9), rgba(12,18,34,.92))",
                 boxShadow: doubted ? "inset 0 0 0 1.5px #F0385A, 0 0 16px rgba(240,56,90,.3)" : "inset 0 0 0 1px rgba(130,180,230,.22)",
               }}
             >
-              <Avatar name={p.name} index={i} size={36} />
-              <span className="w-full truncate text-center text-[13px] font-semibold">{first(p.name)}</span>
-              <span className="w-[70%]">
+              <Avatar name={p.name} index={i} size={32} />
+              <span className="w-full truncate text-center text-[11.5px] font-semibold">{mine ? "You" : first(p.name)}</span>
+              <span className="w-[72%]">
                 <Meter value={p.doubt ?? 0} color="#F0385A" />
               </span>
-              <span className="label !text-[8.5px]">{mine ? "You" : p.isBot ? "Bot" : `Doubt ${p.doubt ?? 0}%`}</span>
+              <span className="label !text-[8px]">{p.isBot ? "AI" : `${p.doubt ?? 0}%`}</span>
             </button>
           );
         })}
       </div>
 
-      <div className="mt-3 flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto">
-        {card && (
-          <div style={hidden ? { filter: "blur(14px)", opacity: 0.6 } : undefined} className="transition-[filter,opacity] duration-200">
-            <RoleCard card={card} compact />
+      {/* Swipe through the case. */}
+      <div
+        ref={deck}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          setPage(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)));
+        }}
+        className="mt-3 flex min-h-[220px] flex-1 snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden"
+        style={{ scrollbarWidth: "none" }}
+      >
+        <section className="panel flex w-full shrink-0 snap-center flex-col overflow-y-auto p-4">
+          <p className="eyebrow m-0">The case</p>
+          <p className="display m-0 mt-1 text-[22px]">{room.case?.title}</p>
+          <div className="mt-2">
+            <Fact k="What" v={room.case?.facts?.what ?? room.case?.crime ?? ""} />
+            {room.case?.facts?.when && <Fact k="When" v={room.case.facts.when} />}
+            <Fact k="Where" v={room.case?.facts?.where ?? room.case?.setting ?? ""} />
           </div>
-        )}
-        {(room.botClues?.length ?? 0) > 0 && (
-          <div className="panel p-3">
-            <p className="label m-0 text-snow">{room.botClues![0].from} saw · everyone can see this</p>
-            {room.botClues!.map((b, i) => (
-              <p key={i} className="m-0 mt-1.5 text-[13.5px] leading-snug text-mist">
-                {b.text}
-              </p>
+          <p className="mt-auto pt-3 text-[14px] leading-snug text-mist">
+            One of you did it. Say what you saw out loud, work out who is lying, then vote.
+          </p>
+          <p className="label mt-2 text-center">Swipe → your role · evidence · every suspect</p>
+        </section>
+
+        <section className="flex w-full shrink-0 snap-center flex-col justify-center overflow-y-auto">
+          {card && <RoleCard card={card} compact />}
+          <p className="label mt-2 text-center">Only you can see this card</p>
+        </section>
+
+        <section className="panel flex w-full shrink-0 snap-center flex-col overflow-y-auto p-4">
+          <p className="eyebrow m-0">Evidence board</p>
+          <p className="m-0 mt-1 text-[13.5px] text-mist">Found by the AI suspects. Everyone sees these.</p>
+          <div className="mt-2 flex flex-col gap-2">
+            {evidence.length === 0 && <p className="blink m-0 text-[14px] text-mist">First piece of evidence is on its way</p>}
+            {evidence.map((e, i) => (
+              <div key={i} className="rise rounded-[10px] bg-black/30 px-3 py-2">
+                <p className="m-0 text-[14px] leading-snug">{e.text}</p>
+                <p className="label m-0 mt-1">Reported by {e.from}</p>
+              </div>
             ))}
           </div>
-        )}
-        <div className="panel p-3">
-          <p className="eyebrow m-0">Status</p>
-          <p className="m-0 mt-1 text-[14px] leading-snug">
-            Argue it out. Tap a player above to mark who you doubt. Voting opens when the clock hits zero.
-          </p>
-        </div>
-        <Stories room={room} />
+        </section>
+
+        {others.map((p) => {
+          const i = indexOf(room, p.id);
+          const doubted = you?.doubting === p.id;
+          return (
+            <section key={p.id} className="panel flex w-full shrink-0 snap-center flex-col items-center justify-center gap-2 overflow-y-auto p-4 text-center">
+              <Avatar name={p.name} index={i} size={64} />
+              <p className="display m-0 text-[24px]">{label(room, p.name)}</p>
+              <p className="label m-0 text-snow">{p.caseRole ?? "Suspect"}{p.isBot ? " · AI" : ""}</p>
+              {p.alibi && <p className="m-0 max-w-[18rem] text-[14.5px] leading-snug text-mist">“{p.alibi}”</p>}
+              <button
+                type="button"
+                className={`btn tap mt-2 !min-h-12 !w-auto px-6 !text-[15px] ${doubted ? "btn-danger" : "btn-glass"}`}
+                onClick={() => {
+                  sfx.tap();
+                  void actions.doubt(doubted ? null : p.id).catch(() => {});
+                }}
+              >
+                {doubted ? "You doubt them" : "I doubt them"} · {p.doubt ?? 0}%
+              </button>
+            </section>
+          );
+        })}
       </div>
 
-      <button type="button" className="btn btn-glass tap mt-3" onClick={() => setHidden((h) => !h)}>
-        {hidden ? "Show my card" : "Hide my card"}
-      </button>
+      <div className="mt-2.5 flex shrink-0 items-center justify-center gap-1.5" aria-hidden="true">
+        {Array.from({ length: pages }, (_, i) => (
+          <button key={i} type="button" tabIndex={-1} onClick={() => go(i)} className="h-1.5 rounded-full border-0 p-0 transition-all" style={{ width: i === page ? 18 : 6, background: i === page ? "#5FDDF7" : "rgba(174,182,200,.4)" }} />
+        ))}
+      </div>
+
+      {you?.isHost ? (
+        <button type="button" className="btn btn-primary tap mt-2.5" onClick={() => void actions.skip().catch(() => {})}>
+          Everyone ready? Vote now
+          <Arrow />
+        </button>
+      ) : (
+        <p className="label mb-1 mt-3 text-center text-snow">Say what you saw, out loud · then you all vote</p>
+      )}
+
+      {drop && !hot && (
+        <div className="panel rise pointer-events-none absolute inset-x-4 top-[70px] z-20 p-3.5" style={{ boxShadow: "inset 0 0 0 1.5px #5FDDF7, 0 12px 40px rgba(0,0,0,.6)" }}>
+          <p className="eyebrow m-0">New evidence · from {drop.from}</p>
+          <p className="m-0 mt-1 text-[14.5px] leading-snug">{drop.text}</p>
+        </div>
+      )}
 
       {hot && (
         <div className="scrim !justify-center px-6" role="alert" style={{ background: "rgba(40,6,18,.92)" }}>
@@ -520,7 +623,7 @@ export function Vote({ room, actions, secondsLeft }: Props) {
     <main className="screen warm">
       <TopBar />
       <h1 className="display m-0 mt-1 text-center text-[clamp(26px,8vw,32px)] uppercase">Who did it?</h1>
-      <p className="m-0 mt-1 text-center text-[14.5px] text-mist">Lock your accusation before time runs out.</p>
+      <p className="m-0 mt-1 text-center text-[14.5px] text-mist">Tap the person you think did it, then lock it in.</p>
       <div className="mt-3">
         <Timer seconds={secondsLeft ?? 0} total={total} label="Voting phase" sub={`${votesIn} / ${room.players.length} votes in`} />
       </div>
@@ -547,7 +650,7 @@ export function Vote({ room, actions, secondsLeft }: Props) {
               }}
             >
               <Avatar name={p.name} index={i} size={46} />
-              <span className="w-full truncate text-center text-[16px] font-bold leading-tight">{p.name}</span>
+              <span className="w-full truncate text-center text-[16px] font-bold leading-tight">{label(room, p.name)}</span>
               <span className="label line-clamp-2 text-center">{mine ? "You" : (p.caseRole ?? (p.isBot ? "AI bot" : "Suspect"))}</span>
               <span className="mt-1.5 w-full px-1">
                 <Meter value={p.doubt ?? 0} color="#F0385A" />
@@ -565,7 +668,7 @@ export function Vote({ room, actions, secondsLeft }: Props) {
         {error ? error : voted ? "Locked. Waiting for the others." : pick ? "One tap locks it. No changing your mind." : "Tap a suspect to accuse"}
       </p>
       <button type="button" className="btn btn-danger tap" disabled={!pick || voted || busy} onClick={lock}>
-        {voted ? "Accusation locked" : pick ? `Lock accusation: ${first(room.players.find((p) => p.id === pick)?.name ?? "")}` : "Lock Accusation"}
+        {voted ? "Accusation locked" : pick ? `Lock accusation: ${label(room, room.players.find((p) => p.id === pick)?.name ?? "")}` : "Lock Accusation"}
       </button>
     </main>
   );
@@ -597,6 +700,7 @@ export function Verdict({ room, actions }: Props) {
     const votedRight = r.votes.some((v) => v.voterId === you.id && v.targetId === r.culpritId);
     const gained = 100 + (wasCulprit ? (r.caught ? 0 : 250) : votedRight ? 150 : 0);
     sessionStorage.setItem(key, String(gained));
+    countRound();
     setXp({ gained, total: addXp(gained) });
   }, [room.code, r, you]);
 
@@ -677,10 +781,20 @@ export function Verdict({ room, actions }: Props) {
       <div className="mt-1.5 flex shrink-0 flex-col gap-1.5">
         {tally.map(({ p, i, n }) => (
           <div key={p.id} className="grid grid-cols-[84px_1fr_18px] items-center gap-2.5 text-[13.5px]">
-            <span className="truncate font-semibold">{first(p.name)}</span>
+            <span className="truncate font-semibold">{label(room, p.name)}</span>
             <Meter value={(n / max) * 100} color={n ? ringOf(i) : "transparent"} />
             <span className="mono text-right">{n}</span>
           </div>
+        ))}
+      </div>
+
+      <p className="label mt-3 text-snow">Who accused whom</p>
+      <div className="mt-1.5 flex shrink-0 flex-wrap gap-1.5">
+        {r.votes.map((v) => (
+          <span key={v.voterId} className="rounded-full px-2.5 py-1 text-[12px]" style={{ background: "rgba(255,255,255,.06)", boxShadow: `inset 0 0 0 1px ${v.targetId === r.culpritId ? "rgba(182,243,106,.55)" : "rgba(130,180,230,.22)"}` }}>
+            {label(room, v.voterName)}
+            {room.players.find((p) => p.id === v.voterId)?.isBot ? " (AI)" : ""} → <b>{label(room, v.targetName)}</b>
+          </span>
         ))}
       </div>
 
@@ -725,12 +839,24 @@ export function Verdict({ room, actions }: Props) {
           </button>
         ) : (
           <div className="btn btn-glass">
-            <span className="blink">Waiting for the host to deal the next case</span>
+            <span className="blink">Host can start the next case</span>
           </div>
         )}
-        <button type="button" className="btn btn-glass tap !text-[15px]" onClick={() => setShare(true)}>
-          Share the front page
-        </button>
+        <div className="grid grid-cols-2 gap-2.5">
+          <button type="button" className="btn btn-glass tap !text-[15px]" onClick={() => setShare(true)}>
+            Share result
+          </button>
+          <button
+            type="button"
+            className="btn btn-glass tap !text-[15px]"
+            onClick={() => {
+              audio.current?.pause();
+              actions.home();
+            }}
+          >
+            Back to home
+          </button>
+        </div>
       </div>
 
       {share && (
