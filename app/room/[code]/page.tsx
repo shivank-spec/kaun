@@ -54,8 +54,12 @@ function Room({ code }: { code: string }) {
   }, [status, secondsLeft]);
   useEffect(() => {
     if (status === "reveal") sfx.sting();
+    // Ask the server to get the narrator ready while everyone is still arguing.
+    if (status === "discuss" && mine?.playerId) {
+      void post(`/api/room/${code}/warm`, { playerId: mine.playerId }).catch(() => {});
+    }
     if (status === "briefing" || status === "vote") sfx.clue();
-  }, [status]);
+  }, [status, code, mine?.playerId]);
 
   // Keep the phone awake during a round.
   useEffect(() => {

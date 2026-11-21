@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import { after } from "next/server";
 import { generateCase } from "./generate-case";
 import { store, type PlayerRow, type RoomRow } from "./store";
 import { narrate } from "./voice";
@@ -253,6 +252,26 @@ export async function setDoubt(codeRaw: string, playerId: string, targetId: stri
   return { ok: true };
 }
 
+/**
+ * Record the narrator reading both possible endings while the room is still
+ * arguing, so the reveal plays the instant the votes are in. Returns nothing
+ * about the case, so calling it cannot leak who did it.
+ */
+export async function warmNarration(codeRaw: string, playerId: string) {
+  const code = codeRaw.toUpperCase();
+  const db = store();
+  const room = await db.getRoom(code);
+  if (!room?.case_file || (room.status !== "discuss" && room.status !== "vote")) return { ok: true };
+  const players = await db.listPlayers(code);
+  if (!players.some((p) => p.id === playerId)) throw new GameError("You are not in this room", 403);
+  const noir = room.settings.tone === "noir";
+  await Promise.allSettled([
+    narrate(narrationOf(room.case_file, true), noir),
+    narrate(narrationOf(room.case_file, false), noir),
+  ]);
+  return { ok: true };
+}
+
 export async function playAgain(codeRaw: string, playerId: string) {
   const code = codeRaw.toUpperCase();
   const db = store();
@@ -293,19 +312,6 @@ async function advance(room: RoomRow, players: PlayerRow[]): Promise<RoomRow> {
   }
   if (!next) return room;
   const moved = await db.updateRoomIf(room.code, next.expected, next.patch);
-  if (moved && next.patch.status === "discuss" && room.case_file) {
-    // While everyone argues, record the narrator reading both possible endings,
-    // so the reveal plays the instant the votes are in.
-    const file = room.case_file;
-    const noir = room.settings.tone === "noir";
-    try {
-      after(() =>
-        Promise.allSettled([narrate(narrationOf(file, true), noir), narrate(narrationOf(file, false), noir)]),
-      );
-    } catch {
-      // Outside a request (tests): skip the warm-up.
-    }
-  }
   if (moved && next.patch.status === "vote" && room.case_file) {
     // Bots vote the moment voting opens: right about half the time.
     const culprit = room.case_file.culprit_id;
