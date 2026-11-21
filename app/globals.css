@@ -355,6 +355,13 @@ input:focus-visible {
 
 }
 
+/* Cards that open over the game are solid, so nothing behind shows through. */
+.scrim .panel {
+  background: linear-gradient(180deg, #1b2743, #0c1322);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 /* ---------- motion ---------- */
 
 @keyframes screenIn {

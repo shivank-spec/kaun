@@ -391,6 +391,7 @@ function Tile({
   hint,
   accent,
   badge,
+  wide,
   children,
   onOpen,
 }: {
@@ -398,6 +399,7 @@ function Tile({
   hint: string;
   accent: string;
   badge?: string;
+  wide?: boolean;
   children?: React.ReactNode;
   onOpen: () => void;
 }) {
@@ -408,7 +410,7 @@ function Tile({
         sfx.tap();
         onOpen();
       }}
-      className="tap relative flex flex-col items-center justify-center gap-1.5 rounded-[16px] border-0 px-2 py-3 text-center text-snow"
+      className={`tap relative flex flex-col items-center justify-center gap-1.5 rounded-[16px] border-0 px-2 py-3 text-center text-snow ${wide ? "col-span-2" : ""}`}
       style={{
         background: "linear-gradient(180deg, rgba(28,40,66,.9), rgba(12,18,34,.94))",
         boxShadow: `inset 0 0 0 1px rgba(130,180,230,.22), inset 0 3px 0 ${accent}`,
@@ -469,7 +471,7 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
       </p>
 
       <div className="mt-3 grid min-h-[260px] flex-1 auto-rows-fr grid-cols-2 gap-2.5">
-        <Tile title="The case" hint="What happened" accent="#5FDDF7" onOpen={() => setOpen("case")}>
+        <Tile title="The case" hint="What happened" accent="#5FDDF7" wide={(3 + others.length) % 2 === 1} onOpen={() => setOpen("case")}>
           <Glyph d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5" />
         </Tile>
         <Tile title="Your secret role" hint="Only you see this" accent={card?.role === "culprit" ? "#F0385A" : "#5FDDF7"} onOpen={() => setOpen("role")}>
@@ -525,7 +527,7 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
                 <div className="mt-3">
                   <Fact k="What" v={room.case?.facts?.what ?? room.case?.crime ?? ""} />
                   {room.case?.facts?.when && <Fact k="When" v={room.case.facts.when} />}
-                  <Fact k="Where" v={room.case?.facts?.where ?? room.case?.setting ?? ""} />
+                  <Fact k="Where" v={room.case?.facts?.where ?? (room.case?.setting ?? "").split(/ [–-] |,| \(/)[0]} />
                 </div>
               </div>
             )}
