@@ -42,6 +42,7 @@ export interface CaseFile {
   ending_caught: string; // narrator reveal if culprit is caught
   ending_escaped: string; // narrator reveal if an innocent is framed
   roast: string; // one-line roast of the culprit
+  hot_seat?: { player_id: string; question: string }; // multiplayer mid-round twist
 }
 
 /* ---------- SOLO: what the browser receives ---------- */
@@ -83,6 +84,13 @@ export interface SoloVerdict {
   motive: string;
   score: number; // 0-1000
   cluesFound: number;
+  leaderboard?: LeaderboardView;
+}
+
+export interface LeaderboardView {
+  top: { name: string; score: number; caseTitle: string }[];
+  solvedToday: number;
+  playedToday: number;
 }
 
 /* ---------- MULTIPLAYER: what the browser receives ---------- */
@@ -125,8 +133,12 @@ export interface RoomView {
   phaseEndsAt: string | null; // ISO UTC. Countdown = phaseEndsAt - serverNow
   serverNow: string; // ISO UTC, use to correct clock drift
   settings: RoomSettings;
-  players: { id: string; name: string; isHost: boolean; hasVoted: boolean }[];
+  players: { id: string; name: string; isHost: boolean; hasVoted: boolean; isBot?: boolean }[];
   you: { id: string; name: string; isHost: boolean; card: PlayerCard | null } | null;
   case: { title: string; crime: string; intro: string } | null; // null in lobby
   reveal: RoomReveal | null; // only in "reveal"
+  /** Mid-discussion twist. Non-null for ~15 s: freeze the screen and show it to everyone. */
+  hotSeat?: { playerId: string; playerName: string; question: string; endsAt: string } | null;
+  /** What AI bot players "saw". Bots cannot talk, so show these to everyone during play. */
+  botClues?: { from: string; text: string }[];
 }

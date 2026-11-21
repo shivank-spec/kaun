@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { Tone } from "@/lib/types";
+import type { LeaderboardView, Tone } from "@/lib/types";
 
 const SETTINGS = ["Kolkata", "This hackathon room"] as const;
 
@@ -17,12 +17,28 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [demo, setDemo] = useState(false);
+  const [rejoin, setRejoin] = useState<string | null>(null);
+  const [board, setBoard] = useState<LeaderboardView | null>(null);
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     setDemo(q.get("demo") === "true");
     setName(localStorage.getItem("kaun.name") || "");
     // Reconnect: if a game is in progress, offer to jump back in.
+    // If this phone was in a game that is still running, offer a way back in.
+    try {
+      const sess = JSON.parse(localStorage.getItem("kaun.session") || "null");
+      if (sess?.code && sess?.playerId) {
+        fetch(`/api/room/${sess.code}?playerId=${sess.playerId}`, { cache: "no-store" })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((room) => room?.you && setRejoin(sess.code))
+          .catch(() => {});
+      }
+    } catch {}
+    fetch("/api/leaderboard", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setBoard)
+      .catch(() => {});
     const join = q.get("join");
     if (join) {
       setCode(join.toUpperCase().slice(0, 4));
@@ -125,6 +141,11 @@ export default function Home() {
                 </div>
               </div>
             </div>
+            {rejoin && (
+              <button className="btn btn-danger" onClick={() => router.push(`/room/${rejoin}`)}>
+                Rejoin room {rejoin}
+              </button>
+            )}
             <button className="btn btn-primary" onClick={() => router.push(soloHref)}>
               Play solo
             </button>
@@ -179,7 +200,9 @@ export default function Home() {
 
         {error && <p className="text-center text-sm text-culprit">{error}</p>}
         <p className="pt-2 text-center font-type text-[0.65rem] tracking-[0.15em] text-muted">
-          NO SIGN-UP · 3 MINUTES · PLAY AGAIN FOREVER
+          {board && board.playedToday > 0
+            ? `${board.playedToday} CASES PLAYED TODAY · TOP: ${board.top[0]?.name?.toUpperCase() ?? "NOBODY YET"} ${board.top[0]?.score ?? ""}`
+            : "NO SIGN-UP · 3 MINUTES · PLAY AGAIN FOREVER"}
         </p>
       </div>
     </main>

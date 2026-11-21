@@ -27,7 +27,9 @@ const SECONDS = {
   normal: { briefing: 20, discuss: 100, vote: 30 },
   demo: { briefing: 10, discuss: 45, vote: 20 },
 };
-const MIN_PLAYERS = 3;
+const MIN_HUMANS = 2; // with 2 humans an AI bot fills the third seat
+const MIN_SEATS = 3;
+const BOT_NAMES = ["Inspector Bot", "Havaldar Bot"];
 const MAX_PLAYERS = 8;
 const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O
 
@@ -131,7 +133,8 @@ export async function startRoom(
   const players = await db.listPlayers(code);
   const me = players.find((p) => p.id === playerId);
   if (!me?.is_host) throw new GameError("Only the host can start", 403);
-  if (players.length < MIN_PLAYERS) throw new GameError(`Need at least ${MIN_PLAYERS} players`);
+  const humans = players.filter((p) => !p.is_bot);
+  if (humans.length < MIN_HUMANS) throw new GameError(`Need at least ${MIN_HUMANS} players`);
 
   const merged = cleanSettings(settings, room.settings);
   // Claim the transition so a double tap cannot start two cases.
@@ -144,10 +147,26 @@ export async function startRoom(
   if (!claimed) return { ok: true };
 
   try {
+    // Fill empty seats with silent AI bots so two people can still play.
+    for (let i = 0; players.length < MIN_SEATS; i++) {
+      const bot: PlayerRow = {
+        id: crypto.randomUUID(),
+        room_code: code,
+        name: BOT_NAMES[i % BOT_NAMES.length],
+        is_host: false,
+        is_bot: true,
+        card: null,
+        vote: null,
+        joined_at: new Date().toISOString(),
+      };
+      await db.addPlayer(bot);
+      players.push(bot);
+    }
     const { file } = await generateCase({
       setting: merged.setting,
       tone: merged.tone,
       players: players.map((p) => ({ id: p.id, name: p.name })),
+      culpritAmong: humans.map((p) => p.id),
     });
     await Promise.all(
       players.map((p) => db.updatePlayer(p.id, { card: buildCard(file, p.id), vote: null })),
@@ -252,8 +271,41 @@ async function advance(room: RoomRow, players: PlayerRow[]): Promise<RoomRow> {
     };
   }
   if (!next) return room;
-  await db.updateRoomIf(room.code, next.expected, next.patch);
+  const moved = await db.updateRoomIf(room.code, next.expected, next.patch);
+  if (moved && next.patch.status === "vote" && room.case_file) {
+    // Bots vote the moment voting opens: right about half the time.
+    const culprit = room.case_file.culprit_id;
+    await Promise.all(
+      players
+        .filter((p) => p.is_bot && !p.vote)
+        .map((bot) => {
+          const others = players.filter((p) => p.id !== bot.id);
+          const guess =
+            Math.random() < 0.5 ? culprit : others[crypto.randomInt(others.length)].id;
+          return db.updatePlayer(bot.id, { vote: guess });
+        }),
+    );
+  }
   return (await db.getRoom(room.code)) ?? room;
+}
+
+const HOT_SEAT_SECONDS = 15;
+
+/** The hot seat question is live for 15 s starting at the halfway point of discussion. */
+function hotSeatNow(room: RoomRow, players: PlayerRow[]) {
+  const hs = room.case_file?.hot_seat;
+  if (room.status !== "discuss" || !hs || !room.phase_ends_at) return null;
+  const total = (room.settings.demo ? SECONDS.demo : SECONDS.normal).discuss * 1000;
+  const start = Date.parse(room.phase_ends_at) - total / 2;
+  const end = start + HOT_SEAT_SECONDS * 1000;
+  const target = players.find((p) => p.id === hs.player_id && !p.is_bot);
+  if (!target || Date.now() < start || Date.now() >= end) return null;
+  return {
+    playerId: target.id,
+    playerName: target.name,
+    question: hs.question,
+    endsAt: new Date(end).toISOString(),
+  };
 }
 
 /** What one player is allowed to see. Secrets never leave the server early. */
@@ -279,9 +331,17 @@ export async function getRoomView(codeRaw: string, playerId: string | null): Pro
       name: p.name,
       isHost: p.is_host,
       hasVoted: Boolean(p.vote),
+      ...(p.is_bot ? { isBot: true } : {}),
     })),
     you: me ? { id: me.id, name: me.name, isHost: me.is_host, card: showCard ? me.card : null } : null,
     case: f && showCard ? { title: f.title, crime: f.crime, intro: f.intro } : null,
     reveal: room.status === "reveal" ? room.reveal : null,
+    hotSeat: hotSeatNow(room, players),
+    botClues:
+      showCard && room.status !== "reveal"
+        ? players
+            .filter((p) => p.is_bot)
+            .flatMap((p) => (p.card?.clues ?? []).map((text) => ({ from: p.name, text })))
+        : [],
   };
 }

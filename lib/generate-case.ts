@@ -50,6 +50,7 @@ const CaseZ = z.object({
   ending_caught: str,
   ending_escaped: str,
   roast: str,
+  hot_seat: z.object({ player_id: str, question: str }).optional(),
 });
 
 /** Logic check: the puzzle must actually be solvable. Returns an error string or null. */
@@ -143,8 +144,16 @@ ${COMMON_RULES}
   };
 }
 
-function roomPrompt(setting: string, tone: Tone, players: { id: string; name: string }[]) {
+function roomPrompt(
+  setting: string,
+  tone: Tone,
+  players: { id: string; name: string }[],
+  culpritAmong?: string[],
+) {
   const list = players.map((p) => `${p.id} = ${p.name}`).join(", ");
+  const culpritRule = culpritAmong
+    ? `The culprit MUST be one of these ids, chosen at random: ${culpritAmong.join(", ")}.`
+    : "Pick the culprit at random from the players.";
   return {
     system: `You design airtight mini-mysteries for a party game where REAL FRIENDS are the suspects and argue out loud for 2 minutes. ${toneGuide(tone)}
 Return ONE JSON object with exactly these keys:
@@ -152,11 +161,14 @@ Return ONE JSON object with exactly these keys:
  "suspects":[{"id","name","role","persona","speaking_style","public_alibi","innocent_secret","private_clues":[2 strings]} one per player, using the EXACT ids and names given],
  "culprit_id","motive","method","timeline":[4-6 short beats with clock times],
  "clues":[],
- "alibi_hole","culprit_objective","ending_caught","ending_escaped","roast"}
+ "alibi_hole","culprit_objective","ending_caught","ending_escaped","roast",
+ "hot_seat":{"player_id","question"}}
 ${COMMON_RULES}
-- Pick the culprit at random from the players.
+- ${culpritRule}
+- "hot_seat": pick one INNOCENT player and write one short, funny, slightly incriminating question addressed to them by name that they must answer out loud (e.g. "Priya, why was there powdered sugar on your kurta at 8:15?"). It must be explainable by their innocent_secret.
 - "role" is what that player was doing at the scene. "public_alibi" is one line they can say out loud.
-- private_clues for an INNOCENT player: exactly 2 short first-person observations ("I saw ...", "I heard ..."). Across all innocent players, at least half of these observations must genuinely implicate the culprit (by name or by a detail that matches the culprit's role/alibi_hole); the rest are red herrings that make ANOTHER innocent player look suspicious for a harmless reason.
+- private_clues for an INNOCENT player: exactly 2 short first-person observations ("I saw ...", "I heard ..."). Across all innocent players, at least half of these observations must genuinely implicate the culprit; the rest are red herrings that make ANOTHER innocent player look suspicious for a harmless reason.
+- Make it a real puzzle: at most ONE clue in the whole case may name the culprit directly. Every other true clue must point at the culprit only through a detail (what they wore or carried, where they stood, a time that breaks their alibi) that players have to match up by talking. Red herrings may name people.
 - private_clues for the CULPRIT: exactly 2 short facts they can use to deflect blame onto specific other players (true-sounding and awkward for those players).
 - No clue may reveal the culprit outright with certainty by itself; players must combine clues.
 - Be playful about the players by name, never mean, nothing about looks, religion, caste or gender.`,
@@ -172,15 +184,25 @@ export interface GenerateOptions {
   setting?: string;
   tone?: Tone;
   players?: { id: string; name: string }[]; // present = multiplayer
+  culpritAmong?: string[]; // multiplayer: ids allowed to be the culprit (humans, not bots)
 }
 
-function parse(raw: unknown, mode: "solo" | "room", players?: { id: string; name: string }[]) {
+function parse(
+  raw: unknown,
+  mode: "solo" | "room",
+  players?: { id: string; name: string }[],
+  culpritAmong?: string[],
+) {
   const c = CaseZ.parse(raw) as CaseFile;
   if (players) {
     // Force exact ids and names so cards always map to real players.
     const byId = new Map(c.suspects.map((s) => [s.id, s]));
     if (players.some((p) => !byId.has(p.id))) throw new Error("missing player in case");
     c.suspects = players.map((p) => ({ ...byId.get(p.id)!, name: p.name }));
+    if (culpritAmong && !culpritAmong.includes(c.culprit_id)) throw new Error("culprit is a bot");
+    if (c.hot_seat && (c.hot_seat.player_id === c.culprit_id || !byId.has(c.hot_seat.player_id))) {
+      delete c.hot_seat;
+    }
   }
   const problem = validateCase(c, mode);
   if (problem) throw new Error(`illogical case: ${problem}`);
@@ -188,13 +210,16 @@ function parse(raw: unknown, mode: "solo" | "room", players?: { id: string; name
 }
 
 /** Hand-written case re-cast onto the real players, so multiplayer never stalls. */
-function fallbackFor(players?: { id: string; name: string }[]): CaseFile {
+function fallbackFor(players?: { id: string; name: string }[], culpritAmong?: string[]): CaseFile {
   const base = structuredClone(
     FALLBACK_CASES[Math.floor(Math.random() * FALLBACK_CASES.length)],
   ) as CaseFile;
   if (!players) return base;
 
-  const culpritIdx = Math.floor(Math.random() * players.length);
+  const allowed = players
+    .map((p, i) => ({ p, i }))
+    .filter((x) => !culpritAmong || culpritAmong.includes(x.p.id));
+  const culpritIdx = allowed[Math.floor(Math.random() * allowed.length)].i;
   const oldCulprit = base.suspects.find((s) => s.id === base.culprit_id)!;
   const oldInnocents = base.suspects.filter((s) => s.id !== base.culprit_id);
   const culprit = players[culpritIdx];
@@ -245,15 +270,17 @@ export async function generateCase(
   const tone: Tone = opts.tone === "noir" ? "noir" : "desi";
   const setting = resolveSetting(opts.setting);
   const mode = opts.players ? "room" : "solo";
-  const prompt = opts.players ? roomPrompt(setting, tone, opts.players) : soloPrompt(setting, tone);
+  const prompt = opts.players
+    ? roomPrompt(setting, tone, opts.players, opts.culpritAmong)
+    : soloPrompt(setting, tone);
 
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const raw = await chatJSON({ ...prompt, temperature: 0.95, maxTokens: 3500, groqTimeoutMs: 12000 });
-      return { file: parse(raw, mode, opts.players), source: "ai" };
+      return { file: parse(raw, mode, opts.players, opts.culpritAmong), source: "ai" };
     } catch (e) {
       console.warn(`[case] attempt ${attempt + 1} failed:`, (e as Error).message);
     }
   }
-  return { file: fallbackFor(opts.players), source: "fallback" };
+  return { file: fallbackFor(opts.players, opts.culpritAmong), source: "fallback" };
 }

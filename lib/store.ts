@@ -19,6 +19,7 @@ export interface PlayerRow {
   room_code: string;
   name: string;
   is_host: boolean;
+  is_bot?: boolean;
   card: PlayerCard | null;
   vote: string | null;
   joined_at: string;
@@ -32,6 +33,7 @@ export interface Store {
   listPlayers(code: string): Promise<PlayerRow[]>;
   addPlayer(row: PlayerRow): Promise<void>;
   updatePlayer(id: string, patch: Partial<PlayerRow>): Promise<void>;
+  /** Clear cards and votes, and remove AI bots, ready for a new round. */
   resetPlayers(code: string): Promise<void>;
 }
 
@@ -69,8 +71,10 @@ const memoryStore: Store = {
     if (p) mem.players.set(id, { ...p, ...patch });
   },
   async resetPlayers(code) {
-    for (const p of mem.players.values()) {
-      if (p.room_code === code) mem.players.set(p.id, { ...p, card: null, vote: null });
+    for (const p of [...mem.players.values()]) {
+      if (p.room_code !== code) continue;
+      if (p.is_bot) mem.players.delete(p.id);
+      else mem.players.set(p.id, { ...p, card: null, vote: null });
     }
   },
 };
@@ -110,9 +114,17 @@ function supabaseStore(db: SupabaseClient): Store {
       must(await db.from("players").update(patch).eq("id", id));
     },
     async resetPlayers(code) {
+      must(await db.from("players").delete().eq("room_code", code).eq("is_bot", true));
       must(await db.from("players").update({ card: null, vote: null }).eq("room_code", code));
     },
   };
+}
+
+/** Raw client for small extras such as the leaderboard. Null when no database is configured. */
+export function database(): SupabaseClient | null {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return url && key ? createClient(url, key, { auth: { persistSession: false } }) : null;
 }
 
 let cached: Store | null = null;

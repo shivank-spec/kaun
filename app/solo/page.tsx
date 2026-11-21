@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import ShareCard from "@/components/ShareCard";
 import type { ChatMessage, InterrogateResponse, SoloCaseView, SoloVerdict } from "@/lib/types";
 
 type Stage = "loading" | "brief" | "play" | "accuse" | "verdict" | "error";
@@ -41,6 +42,9 @@ export default function Solo() {
   const [fresh, setFresh] = useState<string | null>(null);
   const [verdict, setVerdict] = useState<SoloVerdict | null>(null);
   const [speaking, setSpeaking] = useState(false);
+  const [name, setName] = useState("");
+  const [listening, setListening] = useState(false);
+  const [accused, setAccused] = useState("");
   const startedAt = useRef(0);
   const scroller = useRef<HTMLDivElement>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
@@ -67,8 +71,32 @@ export default function Solo() {
   }, []);
 
   useEffect(() => {
+    setName(localStorage.getItem("kaun.name") || "");
     load();
   }, [load]);
+
+  // Speak a question instead of typing it (Chrome and Safari).
+  function listen() {
+    type Rec = {
+      lang: string;
+      interimResults: boolean;
+      onresult: (e: { results: { 0: { transcript: string } }[] }) => void;
+      onend: () => void;
+      onerror: () => void;
+      start: () => void;
+    };
+    const w = window as unknown as { SpeechRecognition?: new () => Rec; webkitSpeechRecognition?: new () => Rec };
+    const Ctor = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!Ctor || listening) return;
+    const rec = new Ctor();
+    rec.lang = "en-IN";
+    rec.interimResults = false;
+    rec.onresult = (e) => ask(e.results[0][0].transcript);
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    setListening(true);
+    rec.start();
+  }
 
   // Rotating loading lines.
   useEffect(() => {
@@ -136,7 +164,10 @@ export default function Solo() {
         suspectId,
         foundClueIds: clues.map((c) => c.id),
         secondsUsed: Math.floor((Date.now() - startedAt.current) / 1000),
+        name,
       });
+      if (name.trim()) localStorage.setItem("kaun.name", name.trim());
+      setAccused(view.suspects.find((x) => x.id === suspectId)?.name ?? "");
       setVerdict(v);
       setStage("verdict");
     } catch {
@@ -337,6 +368,14 @@ export default function Solo() {
               placeholder={`Ask ${suspect.name.split(" ")[0]} anything…`}
               className="min-h-14 flex-1 rounded-xl border border-paper/25 bg-transparent px-4 outline-none focus:border-taxi"
             />
+            <button
+              type="button"
+              onClick={listen}
+              aria-label="Ask by voice"
+              className={`min-h-14 rounded-xl px-4 font-semibold ${listening ? "bg-culprit" : "bg-paper/15"}`}
+            >
+              {listening ? "…" : "Mic"}
+            </button>
             <button className="min-h-14 rounded-xl bg-paper/15 px-4 font-semibold" disabled={thinking}>
               Ask
             </button>
@@ -378,6 +417,12 @@ export default function Solo() {
       <main className="relative z-10 flex min-h-dvh flex-col px-5 pb-6 pt-10">
         {left <= 0 && <p className="font-type text-xs tracking-[0.25em] text-culprit">TIME IS UP</p>}
         <h1 className="mt-1 font-serif text-6xl">Who did it?</h1>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value.slice(0, 16))}
+          placeholder="Your name for the leaderboard (optional)"
+          className="mt-4 min-h-12 w-full rounded-xl border border-paper/25 bg-transparent px-4 text-sm outline-none focus:border-taxi"
+        />
         <div className="mt-6 space-y-3">
           {view.suspects.map((s) => (
             <button key={s.id} onClick={() => accuse(s.id)} className="paper block w-full rounded-sm p-4 text-left active:scale-[0.98]">
@@ -398,7 +443,7 @@ export default function Solo() {
   // verdict
   const v = verdict!;
   return (
-    <main className="relative z-10 flex min-h-dvh flex-col px-5 pb-6 pt-10">
+    <main className="relative z-10 flex min-h-dvh flex-col overflow-y-auto px-5 pb-6 pt-10">
       <div className={v.correct ? "text-innocent" : "text-culprit"}>
         <span className="stamp text-2xl">{v.correct ? "Case closed" : "Culprit escaped"}</span>
       </div>
@@ -424,6 +469,35 @@ export default function Solo() {
             <p className="text-[0.65rem] uppercase tracking-widest text-muted">{k}</p>
           </div>
         ))}
+      </div>
+
+      {v.leaderboard && v.leaderboard.top.length > 0 && (
+        <div className="mt-5">
+          <p className="font-type text-[0.7rem] tracking-[0.2em] text-muted">
+            TODAY&apos;S TOP DETECTIVES · {v.leaderboard.solvedToday} CASES CRACKED
+          </p>
+          <ol className="mt-2 space-y-1">
+            {v.leaderboard.top.slice(0, 5).map((r, i) => (
+              <li key={i} className="flex items-baseline justify-between border-b border-paper/10 py-1.5 text-sm">
+                <span>
+                  <span className="mr-2 font-type text-muted">{i + 1}</span>
+                  {r.name}
+                </span>
+                <span className="font-type text-taxi">{r.score}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      <div className="mt-6">
+        <ShareCard
+          headline={v.correct ? `${v.culpritName} caught red-handed` : `${v.culpritName} walks free`}
+          caseTitle={view.title}
+          roast={v.roast}
+          caught={v.correct}
+          votes={[{ voterName: name.trim() || "The detective", targetName: accused || "nobody" }]}
+        />
       </div>
 
       <div className="mt-auto space-y-3 pt-6">
