@@ -604,7 +604,7 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
       </div>
 
       <div className="mt-3 grid min-h-[260px] flex-1 auto-rows-fr grid-cols-2 gap-2.5">
-        <Tile title="The case" hint="What happened" accent="#5FDDF7" wide={(3 + others.length + (powers.plant ? 1 : 0) + (powers.blackout ? 1 : 0) + (powers.detector ? 1 : 0)) % 2 === 1} onOpen={() => setOpen("case")}>
+        <Tile title="The case" hint="What happened" accent="#5FDDF7" wide={(3 + others.length + (powers.plant || powers.blackout ? 1 : 0) + (powers.detector ? 1 : 0)) % 2 === 1} onOpen={() => setOpen("case")}>
           <Glyph d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5" />
         </Tile>
         <Tile title="Your secret role" hint="Only you see this" accent={card?.role === "culprit" ? "#F0385A" : "#5FDDF7"} onOpen={() => setOpen("role")}>
@@ -622,18 +622,18 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
         >
           <Glyph d="M10.500 4a6.500 6.500 0 1 0 4.100 11.600l4.900 4.900 1.400-1.400-4.900-4.900A6.500 6.500 0 0 0 10.500 4zm0 2a4.500 4.500 0 1 1 0 9 4.500 4.500 0 0 1 0-9z" />
         </Tile>
-        {powers.plant && (
-          <Tile title="Plant evidence" hint="Secret power · frame someone" accent="#F0385A" onOpen={() => setOpen("plant")}>
-            <Glyph d="M12 3v10M7 8l5 5 5-5M5 19h14" />
-          </Tile>
-        )}
-        {powers.blackout && (
-          <Tile title="Cut the lights" hint="Secret power · 10 s blackout" accent="#F0385A" onOpen={() => setOpen("blackout")}>
+        {(powers.plant || powers.blackout) && (
+          <Tile
+            title="Secret powers"
+            hint={`${(powers.plant ? 1 : 0) + (powers.blackout ? 1 : 0)} left · only you have these`}
+            accent="#F0385A"
+            onOpen={() => setOpen("powers")}
+          >
             <Glyph d="M13 2L5 14h6l-1 8 8-12h-6z" />
           </Tile>
         )}
         {powers.detector && (
-          <Tile title="Lie detector" hint="Secret power · test evidence" accent="#5FDDF7" onOpen={() => { setFresh(0); setOpen("evidence"); }}>
+          <Tile title="Lie detector" hint="Your secret power · 1 use" accent="#5FDDF7" onOpen={() => { setFresh(0); setOpen("evidence"); }}>
             <Glyph d="M3 12h4l2-6 4 12 2-6h6" />
           </Tile>
         )}
@@ -732,32 +732,31 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
                 )}
               </div>
             )}
-            {open === "plant" && (
+            {open === "powers" && (
               <div className="panel p-5">
-                <p className="eyebrow m-0" style={{ color: "#ff8098" }}>Secret power</p>
-                <p className="display m-0 mt-1 text-[24px]">Frame someone</p>
-                <p className="m-0 mt-1 text-[14px] leading-snug text-mist">
-                  A fake tip against them appears in everyone&apos;s evidence. Nobody will know it was you. One use.
-                </p>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  {others.map((p) => (
-                    <button key={p.id} type="button" className="chip tap !min-h-12" disabled={powerBusy} onClick={() => power("plant", { targetId: p.id })}>
-                      {label(room, p.name)}
+                <p className="eyebrow m-0" style={{ color: "#ff8098" }}>Secret powers · once each</p>
+                {powers.plant && (
+                  <>
+                    <p className="display m-0 mt-2 text-[22px]">Frame someone</p>
+                    <p className="m-0 mt-1 text-[14px] leading-snug text-mist">A fake tip against them appears in everyone&apos;s evidence. Nobody will know it was you.</p>
+                    <div className="mt-2.5 grid grid-cols-2 gap-2">
+                      {others.map((p) => (
+                        <button key={p.id} type="button" className="chip tap !min-h-11" disabled={powerBusy} onClick={() => power("plant", { targetId: p.id })}>
+                          {label(room, p.name)}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {powers.blackout && (
+                  <>
+                    <p className="display m-0 mt-5 text-[22px]">Cut the lights</p>
+                    <p className="m-0 mt-1 text-[14px] leading-snug text-mist">Every phone goes dark for 10 seconds, yours too. Use it when they are getting close.</p>
+                    <button type="button" className="btn btn-danger tap mt-2.5 !min-h-12" disabled={powerBusy} onClick={() => power("blackout")}>
+                      Cut the lights now
                     </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {open === "blackout" && (
-              <div className="panel p-5 text-center">
-                <p className="eyebrow m-0" style={{ color: "#ff8098" }}>Secret power</p>
-                <p className="display m-0 mt-1 text-[24px]">Cut the lights</p>
-                <p className="m-0 mt-1 text-[14px] leading-snug text-mist">
-                  Every phone goes dark for 10 seconds, yours too. Use it when they are getting close. One use.
-                </p>
-                <button type="button" className="btn btn-danger tap mt-4" disabled={powerBusy} onClick={() => power("blackout")}>
-                  Cut the lights now
-                </button>
+                  </>
+                )}
               </div>
             )}
             {opened && (
