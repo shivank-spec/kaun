@@ -200,6 +200,14 @@ function parse(
     if (players.some((p) => !byId.has(p.id))) throw new Error("missing player in case");
     c.suspects = players.map((p) => ({ ...byId.get(p.id)!, name: p.name }));
     if (culpritAmong && !culpritAmong.includes(c.culprit_id)) throw new Error("culprit is a bot");
+    // The culprit's two "cover" clues must point at other people, never at themselves.
+    const culprit = c.suspects.find((x) => x.id === c.culprit_id)!;
+    const others = c.suspects.filter((x) => x.id !== culprit.id);
+    culprit.private_clues = (culprit.private_clues ?? []).map((clue, i) =>
+      clue.toLowerCase().includes(culprit.name.toLowerCase())
+        ? `${others[i % others.length].name} was hovering near the scene right before it happened.`
+        : clue,
+    );
     if (
       c.hot_seat &&
       (c.hot_seat.player_id === c.culprit_id ||
