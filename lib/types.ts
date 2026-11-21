@@ -137,6 +137,8 @@ export interface RoomSettings {
   tone: Tone;
   demo: boolean; // ?demo=true speedrun
   difficulty?: Difficulty;
+  /** Set while the host has paused the round: milliseconds left in the frozen phase. */
+  pausedMs?: number | null;
 }
 
 export interface PlayerCard {
@@ -164,6 +166,9 @@ export interface RoomView {
   status: RoomStatus;
   phaseEndsAt: string | null; // ISO UTC. Countdown = phaseEndsAt - serverNow
   phaseTotalSec?: number; // full length of the current phase, for progress bars
+  /** True while the host has paused. `pausedSecondsLeft` is the frozen clock. */
+  paused?: boolean;
+  pausedSecondsLeft?: number;
   serverNow: string; // ISO UTC, use to correct clock drift
   settings: RoomSettings;
   players: {

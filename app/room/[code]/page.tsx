@@ -45,6 +45,7 @@ function Room({ code }: { code: string }) {
       again: () => run("again", {}),
       doubt: (targetId) => run("doubt", { targetId }),
       skip: () => run("skip", {}),
+      pause: () => run("pause", {}),
       ask: (targetId, question) =>
         post<{ reply?: string; delivered?: boolean }>(`${base}/ask`, { playerId, targetId, question }),
       home: () => router.push("/"),
@@ -53,8 +54,8 @@ function Room({ code }: { code: string }) {
 
   // Sound: a tick for the last ten seconds of talking, a sting on the reveal.
   useEffect(() => {
-    if (status === "discuss" && secondsLeft != null && secondsLeft > 0 && secondsLeft <= 10) sfx.tick(secondsLeft <= 5);
-  }, [status, secondsLeft]);
+    if (status === "discuss" && !room?.paused && secondsLeft != null && secondsLeft > 0 && secondsLeft <= 10) sfx.tick(secondsLeft <= 5);
+  }, [status, secondsLeft, room?.paused]);
   useEffect(() => {
     if (status === "reveal") sfx.sting();
     // Ask the server to get the narrator ready while everyone is still arguing.
@@ -127,7 +128,8 @@ function Room({ code }: { code: string }) {
         </main>
       );
   } else {
-    const props = { room, actions, secondsLeft };
+    // While paused the server sends no end time, so show the frozen clock.
+    const props = { room, actions, secondsLeft: room.paused ? (room.pausedSecondsLeft ?? 0) : secondsLeft };
     switch (room.status) {
       case "lobby":
         body = <Lobby {...props} />;
@@ -152,8 +154,38 @@ function Room({ code }: { code: string }) {
 
   return (
     // Keyed by phase so every change of phase plays the screen transition.
-    <div key={status ?? "none"} onPointerDown={unlockSfx}>
+    <div key={status ?? "none"} className="relative" onPointerDown={unlockSfx}>
       {body}
+      {/* Host control: freeze the round for everyone. */}
+      {room?.you?.isHost && !room.paused && (status === "briefing" || status === "discuss" || status === "vote") && (
+        <button
+          type="button"
+          onClick={() => void actions.pause().catch(() => {})}
+          className="tap label absolute right-4 top-[max(18px,env(safe-area-inset-top))] z-30 rounded-full border-0 px-3 py-2 text-snow"
+          style={{ background: "rgba(12,18,34,.9)", boxShadow: "inset 0 0 0 1px rgba(130,180,230,.4)" }}
+        >
+          Pause
+        </button>
+      )}
+      {room?.paused && (
+        <div className="scrim !justify-center px-6" role="alert" style={{ zIndex: 60, background: "rgba(6,10,20,.93)" }}>
+          <div className="rise text-center">
+            <p className="eyebrow m-0">Paused</p>
+            <p className="display m-0 mt-3 text-[clamp(30px,9.5vw,40px)]">The host paused the game</p>
+            <p className="mono m-0 mt-4 text-[34px]">
+              {String(Math.floor((room.pausedSecondsLeft ?? 0) / 60)).padStart(2, "0")}:{String((room.pausedSecondsLeft ?? 0) % 60).padStart(2, "0")}
+            </p>
+            <p className="label mt-2">left on the clock</p>
+            {room.you?.isHost ? (
+              <button type="button" className="btn btn-primary tap mt-6" onClick={() => void actions.pause().catch(() => {})}>
+                Resume
+              </button>
+            ) : (
+              <p className="blink mt-6 text-[15px] text-mist">Waiting for the host to resume</p>
+            )}
+          </div>
+        </div>
+      )}
       {mine && room && error && (
         <p className="label fixed inset-x-0 top-1 z-40 text-center text-[#ff8098]" role="status">
           Reconnecting

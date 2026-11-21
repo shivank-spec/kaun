@@ -17,6 +17,7 @@ export interface RoomActions {
   again: () => Promise<void>;
   doubt: (targetId: string | null) => Promise<void>;
   skip: () => Promise<void>;
+  pause: () => Promise<void>;
   ask: (targetId: string, question: string) => Promise<{ reply?: string; delivered?: boolean }>;
   home: () => void;
 }
@@ -174,7 +175,9 @@ export function Lobby({ room, actions }: Props) {
         </div>
       </div>
 
-      <p className="eyebrow mt-4 text-center">Players · {room.players.length} / 8</p>
+      <p className="eyebrow mt-4 text-center">
+        {humans.length} {humans.length === 1 ? "player" : "players"} · {Math.max(0, 5 - humans.length)} AI {5 - humans.length === 1 ? "suspect" : "suspects"}
+      </p>
       <div className="mt-2 grid flex-1 grid-cols-2 content-start gap-2.5">
         {room.players.map((p, i) => (
           <div key={p.id} className="panel rise flex items-center gap-2.5 p-2.5">
@@ -186,6 +189,17 @@ export function Lobby({ room, actions }: Props) {
                 <span className="h-1.5 w-1.5 rounded-full bg-lime" />
                 Ready
               </span>
+            </span>
+          </div>
+        ))}
+        {/* Empty seats are filled by AI suspects, so a room always has five. */}
+        {["Asha", "Vikram", "Meera", "Kabir"].slice(0, Math.max(0, 5 - humans.length)).map((name, k) => (
+          <div key={name} className="panel flex items-center gap-2.5 p-2.5" style={{ opacity: 0.82 }}>
+            <Avatar name={name} index={humans.length + k} size={40} />
+            <span className="min-w-0">
+              <span className="block truncate text-[14.5px] font-semibold leading-tight">{name}</span>
+              <span className="label block !text-[9.5px] text-cyan">AI suspect</span>
+              <span className="block text-[11.5px] text-mist">Plays and votes</span>
             </span>
           </div>
         ))}

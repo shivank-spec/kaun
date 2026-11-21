@@ -57,7 +57,7 @@ function cleanSettings(raw: Partial<RoomSettings> | undefined, base?: RoomSettin
     raw?.difficulty === "easy" || raw?.difficulty === "hard" || raw?.difficulty === "medium"
       ? raw.difficulty
       : (base?.difficulty ?? "medium");
-  return { tone, setting, demo: raw?.demo ?? base?.demo ?? false, difficulty };
+  return { tone, setting, demo: raw?.demo ?? base?.demo ?? false, difficulty, pausedMs: null };
 }
 
 /* ---------------- create / join ---------------- */
@@ -313,6 +313,32 @@ Return ONLY JSON: {"reply": string}`,
   return { reply: saw ? `${who.public_alibi}. But I will tell you this: ${(who.private_clues ?? [])[0]}` : `${who.public_alibi}. That is all I know.` };
 }
 
+/** The host can freeze the clock at any time, and start it again. */
+export async function togglePause(codeRaw: string, playerId: string) {
+  const code = codeRaw.toUpperCase();
+  const db = store();
+  const room = await db.getRoom(code);
+  if (!room) throw new GameError("No room with that code", 404);
+  const players = await db.listPlayers(code);
+  if (!players.find((p) => p.id === playerId)?.is_host) throw new GameError("Only the host can pause", 403);
+  if (room.status !== "briefing" && room.status !== "discuss" && room.status !== "vote") return { ok: true, paused: false };
+
+  if (room.settings.pausedMs != null) {
+    // Resume: the phase gets back exactly the time it had left.
+    await db.updateRoomIf(code, room.status, {
+      settings: { ...room.settings, pausedMs: null },
+      phase_ends_at: new Date(Date.now() + room.settings.pausedMs).toISOString(),
+    });
+    return { ok: true, paused: false };
+  }
+  const left = room.phase_ends_at ? Math.max(1000, Date.parse(room.phase_ends_at) - Date.now()) : 1000;
+  await db.updateRoomIf(code, room.status, {
+    settings: { ...room.settings, pausedMs: left },
+    phase_ends_at: null,
+  });
+  return { ok: true, paused: true };
+}
+
 /** The host can cut a phase short once everyone is ready. */
 export async function skipPhase(codeRaw: string, playerId: string) {
   const code = codeRaw.toUpperCase();
@@ -322,7 +348,10 @@ export async function skipPhase(codeRaw: string, playerId: string) {
   const players = await db.listPlayers(code);
   if (!players.find((p) => p.id === playerId)?.is_host) throw new GameError("Only the host can do that", 403);
   if (room.status === "briefing" || room.status === "discuss") {
-    await db.updateRoomIf(code, room.status, { phase_ends_at: new Date().toISOString() });
+    await db.updateRoomIf(code, room.status, {
+      phase_ends_at: new Date().toISOString(),
+      settings: { ...room.settings, pausedMs: null },
+    });
   }
   return { ok: true };
 }
@@ -388,6 +417,7 @@ export async function playAgain(codeRaw: string, playerId: string) {
 /** Move the room forward if its phase has run out. Safe to call from every poll. */
 async function advance(room: RoomRow, players: PlayerRow[]): Promise<RoomRow> {
   const db = store();
+  if (room.settings.pausedMs != null) return room; // the host has frozen the clock
   const t = timings(room.settings);
   const expired = room.phase_ends_at ? Date.now() >= Date.parse(room.phase_ends_at) : false;
   let next: { expected: RoomStatus; patch: Partial<RoomRow> } | null = null;
@@ -472,9 +502,11 @@ export async function getRoomView(codeRaw: string, playerId: string | null): Pro
         .flatMap((p) => (p.card?.clues ?? []).map((text) => ({ from: p.name, text })))
     : [];
   let dropped = 0;
-  if (room.status === "discuss" && room.phase_ends_at) {
+  const pausedMs = room.settings.pausedMs ?? null;
+  if (room.status === "discuss" && (room.phase_ends_at || pausedMs != null)) {
     const total = timings(room.settings).discuss * 1000;
-    const elapsed = total - (Date.parse(room.phase_ends_at) - Date.now());
+    const leftMs = pausedMs != null ? pausedMs : Date.parse(room.phase_ends_at!) - Date.now();
+    const elapsed = total - leftMs;
     // First piece almost at once, the last with about a fifth of the time left.
     dropped = Math.min(evidence.length, 1 + Math.floor((elapsed / (total * 0.8)) * (evidence.length - 1)));
   } else if (room.status === "vote" || room.status === "reveal") {
@@ -490,6 +522,8 @@ export async function getRoomView(codeRaw: string, playerId: string | null): Pro
     status: room.status,
     phaseEndsAt: room.phase_ends_at,
     serverNow: new Date().toISOString(),
+    paused: pausedMs != null,
+    pausedSecondsLeft: pausedMs != null ? Math.ceil(pausedMs / 1000) : undefined,
     phaseTotalSec:
       room.status === "briefing" || room.status === "discuss" || room.status === "vote"
         ? timings(room.settings)[room.status]
