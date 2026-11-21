@@ -260,13 +260,17 @@ function fallbackFor(players?: { id: string; name: string }[], culpritAmong?: st
   const oldCulprit = base.suspects.find((s) => s.id === base.culprit_id)!;
   const oldInnocents = base.suspects.filter((s) => s.id !== base.culprit_id);
   const culprit = players[culpritIdx];
-  const swapName = (t: string) => t.split(oldCulprit.name).join(culprit.name);
+  // The hand-written text uses both "Soumya Dutta" and "Soumya": swap both.
+  const oldFirst = oldCulprit.name.split(" ")[0];
+  const swapName = (t: string) =>
+    t.split(oldCulprit.name).join(culprit.name).replace(new RegExp(`\\b${oldFirst}\\b`, "g"), culprit.name);
   const truth = base.clues.filter((k) => !k.is_red_herring).map((k) => swapName(k.text));
 
   let i = 0;
   base.suspects = players.map((p, idx) => {
     if (idx === culpritIdx) {
-      const scapegoats = players.filter((x) => x.id !== p.id);
+      const humans = players.filter((x) => x.id !== p.id && (!culpritAmong || culpritAmong.includes(x.id)));
+      const scapegoats = humans.length ? humans : players.filter((x) => x.id !== p.id);
       return {
         ...oldCulprit,
         id: p.id,
@@ -278,7 +282,10 @@ function fallbackFor(players?: { id: string; name: string }[], culpritAmong?: st
       };
     }
     const tpl = oldInnocents[i % oldInnocents.length];
-    const other = players.filter((x) => x.id !== p.id && x.id !== culprit.id)[0];
+    // Only point suspicion at real people, never at a bot.
+    const other = players.filter(
+      (x) => x.id !== p.id && x.id !== culprit.id && (!culpritAmong || culpritAmong.includes(x.id)),
+    )[0];
     const clues = [
       `I noticed: ${truth[i % truth.length]}`,
       other

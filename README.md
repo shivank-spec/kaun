@@ -12,16 +12,17 @@ _Link added at submission._
 
 ## How a round works
 
-**Solo (about 2.5 minutes)**
-1. Tap **Play solo**. A new case opens: a missing rosogolla at KC Das, an unplugged router on the hackathon floor, or a setting you type yourself.
-2. Question four suspects by typing or by voice. Three are innocent but hiding something embarrassing. One is lying.
-3. Suspects give up a clue only when your question earns it. Two of the five clues are red herrings.
-4. Accuse someone. The narrator reads the reveal, you get a score, and it goes on today's leaderboard.
+**Solo (2.5 minutes, 6 moves)**
+1. Tap **Play Solo**. A new case opens: a missing rosogolla at KC Das, an unplugged router on the hackathon floor, or a setting you type yourself.
+2. You get a map of the scene, four suspects and **six moves**. Tap a glowing spot to search it. Tap a suspect to walk up to them.
+3. **Ask** (1 move) gets an answer and sometimes a clue. **Press** (2 moves) makes an innocent suspect crack and admit their embarrassing secret. **Confront** (1 move) puts a piece of evidence in front of them: do it to the culprit with real evidence and their story breaks.
+4. The evidence lying around the scene points at the wrong people. The truth comes from the witnesses. Accuse someone before the clock or your moves run out.
+5. The narrator reads the reveal, you earn XP, and your score goes on today's leaderboard.
 
 **With friends (2.5 minutes)**
 1. Tap **Play with friends** and share the 4-letter code or QR. Friends join with only a name.
 2. Every phone shows a secret card: **YOU ARE INNOCENT** with two things you saw, or **YOU ARE THE CULPRIT** with a lie you must sell.
-3. Argue out loud for 100 seconds. Halfway through, the **Hot Seat** freezes every screen and puts one player on the spot with an awkward question.
+3. Argue out loud for 100 seconds. Tap a player to mark who you doubt, and everyone's **doubt meter** moves live. Halfway through, the **Hot Seat** freezes every screen and puts one player on the spot with an awkward question.
 4. Everyone votes on their phone. The narrator reveals the truth and roasts the culprit. One tap plays again with a new case.
 
 Two people can play: an AI bot takes the third seat, shares what it "saw" with everyone, and votes.
@@ -50,6 +51,7 @@ Two people can play: an AI bot takes the third seat, shares what it "saw" with e
 - **Built to survive free AI limits.** Calls rotate across five free quotas (three Groq models, two Gemini models) in `lib/ai.ts`. Solo cases are served mostly from a bank of cases the AI wrote earlier (`lib/pool.ts`). Case writing has a hard 13-second budget.
 - **It keeps working with the AI switched off.** If every provider fails, a new case comes from the bank or from four hand-written cases, and suspects answer from the case facts and can still give up their clues.
 - **One narration per room.** Narrator audio is generated once and cached, so four phones cost one voice call (`app/api/tts/route.ts`).
+- **The rules decide, the AI performs.** Whether a move unlocks a clue, clears a suspect or breaks the culprit's story is decided by code in `lib/solo.ts`; the model only writes the line the suspect says.
 - **Scores are computed on the server** from the sealed case, so the leaderboard cannot be faked from the browser.
 
 `/api/health` reports which AI providers and the database are answering.
