@@ -97,6 +97,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, setting, tone, demo, difficulty }),
+        signal: AbortSignal.timeout(12000), // never leave the button frozen
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -105,9 +106,11 @@ export default function Home() {
         "kaun.session",
         JSON.stringify({ code: data.code, playerId: data.playerId, name: name.trim() }),
       );
-      router.push(`/room/${data.code}`);
+      // A full page load is more dependable than a client-side route change here.
+      window.location.assign(`/room/${data.code}`);
     } catch (e) {
-      setMsg((e as Error).message || "Could not create a room");
+      const timedOut = (e as Error).name === "TimeoutError";
+      setMsg(timedOut ? "That took too long. Check your connection and try again." : (e as Error).message || "Could not create a room");
       setBusy(false);
     }
   }

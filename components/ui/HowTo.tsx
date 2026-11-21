@@ -20,7 +20,7 @@ const STEPS = {
  * and can be opened again with `open`.
  */
 export function HowTo({ mode, open, onClose }: { mode: keyof typeof STEPS; open?: boolean; onClose?: () => void }) {
-  const key = `kaun.howto.${mode}`;
+  const key = "kaun.howto"; // shown once per device, whichever mode comes first
   const [first, setFirst] = useState(false);
   useEffect(() => {
     if (!localStorage.getItem(key)) setFirst(true);

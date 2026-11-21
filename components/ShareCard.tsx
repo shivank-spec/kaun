@@ -67,6 +67,7 @@ export default function ShareCard({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [dataUrl, setDataUrl] = useState("");
   const [sharing, setSharing] = useState(false);
+  const [note, setNote] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -136,7 +137,6 @@ export default function ShareCard({
       const tagW = ctx.measureText(tag).width + 64;
       ctx.save();
       ctx.translate(M, y + 44);
-      ctx.rotate((-3 * Math.PI) / 180);
       ctx.fillStyle = accent;
       roundRect(ctx, 0, -46, tagW, 82, 16);
       ctx.fill();
@@ -231,6 +231,7 @@ export default function ShareCard({
     document.body.appendChild(link);
     link.click();
     link.remove();
+    setNote("Image saved to your downloads.");
   }
 
   async function share() {
@@ -243,12 +244,17 @@ export default function ShareCard({
         const file = new File([blob], "kaun-case.png", { type: "image/png" });
         if (!navigator.canShare || navigator.canShare({ files: [file] })) {
           await navigator.share({ title: "Kaun?", text: `${headline}. Play at ${siteUrl}`, files: [file] });
+          setNote("Shared.");
           return;
         }
       }
+      // This device cannot hand an image to other apps (most laptops): save it instead.
       download();
+      setNote("This device can't share directly, so the image was saved. Upload it to your story from there.");
     } catch (err) {
-      if ((err as Error)?.name !== "AbortError") download();
+      if ((err as Error)?.name === "AbortError") return;
+      download();
+      setNote("Sharing was blocked, so the image was saved instead.");
     } finally {
       setSharing(false);
     }
@@ -267,6 +273,11 @@ export default function ShareCard({
           </div>
         )}
       </div>
+      {note && (
+        <p role="status" className="m-0 text-center text-[13.5px] leading-snug text-cyan">
+          {note}
+        </p>
+      )}
       <div className="grid w-full grid-cols-2 gap-2.5">
         <button type="button" className="btn btn-primary tap !min-h-[52px] !text-[15px]" disabled={sharing || !dataUrl} onClick={share}>
           {sharing ? "Opening" : "Share to story"}

@@ -260,29 +260,6 @@ export function Lobby({ room, actions }: Props) {
   );
 }
 
-/** Everyone's public story: who they are in the case and where they say they were. */
-function Stories({ room }: { room: RoomView }) {
-  const withStory = room.players.filter((p) => p.caseRole || p.alibi);
-  if (!withStory.length) return null;
-  return (
-    <div>
-      <p className="label m-0 text-snow">Everyone&apos;s story</p>
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        {room.players.map((p, i) => (
-          <div key={p.id} className="panel px-3 py-2.5" style={{ borderLeft: `3px solid ${ringOf(i)}` }}>
-            <span className="block truncate text-[14px] font-semibold leading-tight">
-              {first(p.name)}
-              {p.id === room.you?.id ? " (you)" : ""}
-            </span>
-            <span className="block truncate text-[12px] text-mist">{p.caseRole ?? (p.isBot ? "AI bot" : "Suspect")}</span>
-            {p.alibi && <span className="mt-1 line-clamp-3 block text-[12px] leading-snug text-fog">“{p.alibi}”</span>}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /* ---------------- briefing: hold to reveal your secret role ---------------- */
 
 function RoleCard({ card, compact = false }: { card: PlayerCard; compact?: boolean }) {
@@ -384,11 +361,9 @@ export function Briefing({ room, secondsLeft }: Props) {
           <p className="label mt-2">Press and hold the scanner</p>
         </div>
       ) : (
-        <div className="rise mt-3 flex min-h-0 flex-1 flex-col gap-3">
-          <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto">
-            <RoleCard card={card} />
-            <Stories room={room} />
-          </div>
+        <div className="rise flex flex-1 flex-col justify-center gap-4 py-4">
+          <RoleCard card={card} />
+          <p className="label text-center">Remember it. You can open this card again during the discussion.</p>
           <button type="button" className="btn btn-glass tap" onClick={() => { setShown(false); setHold(0); }}>
             Hide my role
           </button>
@@ -398,15 +373,56 @@ export function Briefing({ room, secondsLeft }: Props) {
   );
 }
 
-/* ---------------- discussion ---------------- */
+/* ---------------- discussion: flashcards ---------------- */
 
 /** One row of the case card: a label and a plain fact. */
 function Fact({ k, v }: { k: string; v: string }) {
   return (
-    <div className="flex gap-3 border-t border-white/5 py-2.5 first:border-0">
-      <span className="label w-14 shrink-0 pt-0.5 text-cyan">{k}</span>
-      <span className="text-[15px] leading-snug">{v}</span>
+    <div className="flex gap-3 border-t border-white/10 py-3 first:border-0">
+      <span className="label w-14 shrink-0 pt-1 text-cyan">{k}</span>
+      <span className="text-[16px] leading-snug">{v}</span>
     </div>
+  );
+}
+
+/** A face-down card on the table. Tap to open it. */
+function Tile({
+  title,
+  hint,
+  accent,
+  badge,
+  children,
+  onOpen,
+}: {
+  title: string;
+  hint: string;
+  accent: string;
+  badge?: string;
+  children?: React.ReactNode;
+  onOpen: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        sfx.tap();
+        onOpen();
+      }}
+      className="tap relative flex flex-col items-center justify-center gap-1.5 rounded-[16px] border-0 px-2 py-3 text-center text-snow"
+      style={{
+        background: "linear-gradient(180deg, rgba(28,40,66,.9), rgba(12,18,34,.94))",
+        boxShadow: `inset 0 0 0 1px rgba(130,180,230,.22), inset 0 3px 0 ${accent}`,
+      }}
+    >
+      {badge && (
+        <span className="mono absolute right-2 top-2 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-ink" style={{ background: accent }}>
+          {badge}
+        </span>
+      )}
+      {children}
+      <span className="w-full truncate text-[15px] font-bold leading-tight">{title}</span>
+      <span className="label !text-[9px]">{hint}</span>
+    </button>
   );
 }
 
@@ -417,164 +433,148 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
   const hot = room.hotSeat ?? null;
   const hotLeft = hot ? Math.max(0, Math.ceil((Date.parse(hot.endsAt) - Date.parse(room.serverNow)) / 1000)) : 0;
   const evidence = room.botClues ?? [];
-  const deck = useRef<HTMLDivElement>(null);
-  const [page, setPage] = useState(0);
-  const [drop, setDrop] = useState<{ from: string; text: string } | null>(null);
+  const [open, setOpen] = useState<string | null>(null); // "case" | "role" | "evidence" | player id
+  const [fresh, setFresh] = useState(0); // evidence the player has not opened yet
   const seenEvidence = useRef(evidence.length);
   const lastHot = useRef<string | null>(null);
 
   useEffect(() => {
     if (hot && lastHot.current !== hot.question) {
       lastHot.current = hot.question;
+      setOpen(null);
       sfx.crack();
     }
   }, [hot]);
 
-  // A new piece of evidence just landed: show it to everyone.
+  // New evidence lands on the table: light up the evidence card.
   useEffect(() => {
     if (evidence.length > seenEvidence.current) {
-      const latest = evidence[evidence.length - 1];
-      setDrop(latest);
-      sfx.clue();
-      const t = setTimeout(() => setDrop(null), 4200);
+      setFresh((n) => n + (evidence.length - seenEvidence.current));
       seenEvidence.current = evidence.length;
-      return () => clearTimeout(t);
+      sfx.clue();
     }
-  }, [evidence]);
+  }, [evidence.length]);
 
   const others = room.players.filter((p) => p.id !== you?.id);
-  const pages = 3 + others.length;
-  const go = (i: number) => {
-    const el = deck.current;
-    if (el) el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
-  };
+  const opened = others.find((p) => p.id === open);
 
   return (
     <main className="screen">
       <TopBar />
       <div className="mt-1">
-        <Timer seconds={secondsLeft ?? 0} total={total} label="Discussion" sub={`Evidence ${evidence.length} / ${room.evidenceTotal ?? evidence.length}`} />
+        <Timer seconds={secondsLeft ?? 0} total={total} label="Discussion" sub="Talk it out loud" />
       </div>
+      <p className="m-0 mt-3 text-[15px] leading-snug text-[#E3E8F2]">
+        One of you did it. Open the cards, say what you know, and work out who is lying.
+      </p>
 
-      {/* Tap a face to mark who you doubt. Everyone's meter moves live. */}
-      <div className="mt-3 grid shrink-0 gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(5, room.players.length)}, minmax(0, 1fr))` }}>
-        {room.players.map((p, i) => {
-          const mine = p.id === you?.id;
-          const doubted = you?.doubting === p.id;
-          return (
-            <button
-              key={p.id}
-              type="button"
-              disabled={mine}
-              aria-pressed={doubted}
-              aria-label={mine ? `${p.name}, you` : `Doubt ${p.name}`}
-              onClick={() => {
-                sfx.tap();
-                void actions.doubt(doubted ? null : p.id).catch(() => {});
-              }}
-              className="tap flex flex-col items-center gap-1 rounded-[12px] border-0 px-0.5 pb-1.5 pt-2 text-snow disabled:!opacity-100"
-              style={{
-                background: "linear-gradient(180deg, rgba(28,40,66,.9), rgba(12,18,34,.92))",
-                boxShadow: doubted ? "inset 0 0 0 1.5px #F0385A, 0 0 16px rgba(240,56,90,.3)" : "inset 0 0 0 1px rgba(130,180,230,.22)",
-              }}
-            >
-              <Avatar name={p.name} index={i} size={32} />
-              <span className="w-full truncate text-center text-[11.5px] font-semibold">{mine ? "You" : first(p.name)}</span>
-              <span className="w-[72%]">
-                <Meter value={p.doubt ?? 0} color="#F0385A" />
-              </span>
-              <span className="label !text-[8px]">{p.isBot ? "AI" : `${p.doubt ?? 0}%`}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Swipe through the case. */}
-      <div
-        ref={deck}
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          setPage(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)));
-        }}
-        className="mt-3 flex min-h-[220px] flex-1 snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden"
-        style={{ scrollbarWidth: "none" }}
-      >
-        <section className="panel flex w-full shrink-0 snap-center flex-col overflow-y-auto p-4">
-          <p className="eyebrow m-0">The case</p>
-          <p className="display m-0 mt-1 text-[22px]">{room.case?.title}</p>
-          <div className="mt-2">
-            <Fact k="What" v={room.case?.facts?.what ?? room.case?.crime ?? ""} />
-            {room.case?.facts?.when && <Fact k="When" v={room.case.facts.when} />}
-            <Fact k="Where" v={room.case?.facts?.where ?? room.case?.setting ?? ""} />
-          </div>
-          <p className="mt-auto pt-3 text-[14px] leading-snug text-mist">
-            One of you did it. Say what you saw out loud, work out who is lying, then vote.
-          </p>
-          <p className="label mt-2 text-center">Swipe → your role · evidence · every suspect</p>
-        </section>
-
-        <section className="flex w-full shrink-0 snap-center flex-col justify-center overflow-y-auto">
-          {card && <RoleCard card={card} compact />}
-          <p className="label mt-2 text-center">Only you can see this card</p>
-        </section>
-
-        <section className="panel flex w-full shrink-0 snap-center flex-col overflow-y-auto p-4">
-          <p className="eyebrow m-0">Evidence board</p>
-          <p className="m-0 mt-1 text-[13.5px] text-mist">Found by the AI suspects. Everyone sees these.</p>
-          <div className="mt-2 flex flex-col gap-2">
-            {evidence.length === 0 && <p className="blink m-0 text-[14px] text-mist">First piece of evidence is on its way</p>}
-            {evidence.map((e, i) => (
-              <div key={i} className="rise rounded-[10px] bg-black/30 px-3 py-2">
-                <p className="m-0 text-[14px] leading-snug">{e.text}</p>
-                <p className="label m-0 mt-1">Reported by {e.from}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
+      <div className="mt-3 grid min-h-[260px] flex-1 auto-rows-fr grid-cols-2 gap-2.5">
+        <Tile title="The case" hint="What happened" accent="#5FDDF7" onOpen={() => setOpen("case")}>
+          <Glyph d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5" />
+        </Tile>
+        <Tile title="Your secret role" hint="Only you see this" accent={card?.role === "culprit" ? "#F0385A" : "#5FDDF7"} onOpen={() => setOpen("role")}>
+          <Glyph d="M12 3a4 4 0 0 1 4 4v3h1.500v10h-11V10H8V7a4 4 0 0 1 4-4zM10 10h4V7a2 2 0 0 0-4 0z" />
+        </Tile>
+        <Tile
+          title="Evidence"
+          hint={`${evidence.length} of ${room.evidenceTotal ?? evidence.length} found`}
+          accent="#B6F36A"
+          badge={fresh ? `${fresh} new` : undefined}
+          onOpen={() => {
+            setFresh(0);
+            setOpen("evidence");
+          }}
+        >
+          <Glyph d="M10.500 4a6.500 6.500 0 1 0 4.100 11.600l4.900 4.900 1.400-1.400-4.900-4.900A6.500 6.500 0 0 0 10.500 4zm0 2a4.500 4.500 0 1 1 0 9 4.500 4.500 0 0 1 0-9z" />
+        </Tile>
         {others.map((p) => {
           const i = indexOf(room, p.id);
-          const doubted = you?.doubting === p.id;
           return (
-            <section key={p.id} className="panel flex w-full shrink-0 snap-center flex-col items-center justify-center gap-2 overflow-y-auto p-4 text-center">
-              <Avatar name={p.name} index={i} size={64} />
-              <p className="display m-0 text-[24px]">{label(room, p.name)}</p>
-              <p className="label m-0 text-snow">{p.caseRole ?? "Suspect"}{p.isBot ? " · AI" : ""}</p>
-              {p.alibi && <p className="m-0 max-w-[18rem] text-[14.5px] leading-snug text-mist">“{p.alibi}”</p>}
-              <button
-                type="button"
-                className={`btn tap mt-2 !min-h-12 !w-auto px-6 !text-[15px] ${doubted ? "btn-danger" : "btn-glass"}`}
-                onClick={() => {
-                  sfx.tap();
-                  void actions.doubt(doubted ? null : p.id).catch(() => {});
-                }}
-              >
-                {doubted ? "You doubt them" : "I doubt them"} · {p.doubt ?? 0}%
-              </button>
-            </section>
+            <Tile
+              key={p.id}
+              title={label(room, p.name)}
+              hint={p.isBot ? `AI · doubt ${p.doubt ?? 0}%` : `Doubt ${p.doubt ?? 0}%`}
+              accent={you?.doubting === p.id ? "#F0385A" : ringOf(i)}
+              badge={you?.doubting === p.id ? "doubted" : undefined}
+              onOpen={() => setOpen(p.id)}
+            >
+              <Avatar name={p.name} index={i} size={38} />
+            </Tile>
           );
         })}
-      </div>
-
-      <div className="mt-2.5 flex shrink-0 items-center justify-center gap-1.5" aria-hidden="true">
-        {Array.from({ length: pages }, (_, i) => (
-          <button key={i} type="button" tabIndex={-1} onClick={() => go(i)} className="h-1.5 rounded-full border-0 p-0 transition-all" style={{ width: i === page ? 18 : 6, background: i === page ? "#5FDDF7" : "rgba(174,182,200,.4)" }} />
-        ))}
       </div>
 
       {you?.isHost ? (
-        <button type="button" className="btn btn-primary tap mt-2.5" onClick={() => void actions.skip().catch(() => {})}>
+        <button type="button" className="btn btn-primary tap mt-3" onClick={() => void actions.skip().catch(() => {})}>
           Everyone ready? Vote now
           <Arrow />
         </button>
       ) : (
-        <p className="label mb-1 mt-3 text-center text-snow">Say what you saw, out loud · then you all vote</p>
+        <p className="label mb-1 mt-3 text-center text-snow">The host starts the vote when everyone is ready</p>
       )}
 
-      {drop && !hot && (
-        <div className="panel rise pointer-events-none absolute inset-x-4 top-[70px] z-20 p-3.5" style={{ boxShadow: "inset 0 0 0 1.5px #5FDDF7, 0 12px 40px rgba(0,0,0,.6)" }}>
-          <p className="eyebrow m-0">New evidence · from {drop.from}</p>
-          <p className="m-0 mt-1 text-[14.5px] leading-snug">{drop.text}</p>
+      {/* The opened flashcard. */}
+      {open && !hot && (
+        <div className="scrim !justify-center px-5" role="dialog" aria-label="Card">
+          <button type="button" aria-label="Close card" className="absolute inset-0 border-0 bg-transparent" onClick={() => setOpen(null)} />
+          <div className="rise relative flex max-h-[82%] flex-col gap-3 overflow-y-auto">
+            {open === "case" && (
+              <div className="panel p-5">
+                <p className="eyebrow m-0">The case</p>
+                <p className="display m-0 mt-1 text-[26px]">{room.case?.title}</p>
+                <div className="mt-3">
+                  <Fact k="What" v={room.case?.facts?.what ?? room.case?.crime ?? ""} />
+                  {room.case?.facts?.when && <Fact k="When" v={room.case.facts.when} />}
+                  <Fact k="Where" v={room.case?.facts?.where ?? room.case?.setting ?? ""} />
+                </div>
+              </div>
+            )}
+            {open === "role" && card && <RoleCard card={card} />}
+            {open === "evidence" && (
+              <div className="panel p-5">
+                <p className="eyebrow m-0" style={{ color: "#B6F36A" }}>Evidence</p>
+                <p className="m-0 mt-1 text-[14px] text-mist">Found by the AI suspects. Everyone can see these.</p>
+                <div className="mt-3 flex flex-col gap-2">
+                  {evidence.length === 0 && <p className="blink m-0 text-mist">The first piece is on its way.</p>}
+                  {evidence.map((e, i) => (
+                    <div key={i} className="rounded-[12px] bg-black/30 px-3.5 py-2.5">
+                      <p className="m-0 text-[15px] leading-snug">{e.text}</p>
+                      <p className="label m-0 mt-1">Reported by {e.from}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {opened && (
+              <div className="panel flex flex-col items-center gap-2 p-6 text-center">
+                <Avatar name={opened.name} index={indexOf(room, opened.id)} size={72} />
+                <p className="display m-0 mt-1 text-[28px]">{label(room, opened.name)}</p>
+                <p className="label m-0 text-snow">
+                  {opened.caseRole ?? "Suspect"}
+                  {opened.isBot ? " · AI suspect" : ""}
+                </p>
+                {opened.alibi && (
+                  <>
+                    <p className="label m-0 mt-3">Their story</p>
+                    <p className="m-0 text-[16px] leading-snug">“{opened.alibi}”</p>
+                  </>
+                )}
+                <button
+                  type="button"
+                  className={`btn tap mt-4 ${you?.doubting === opened.id ? "btn-danger" : "btn-glass"}`}
+                  onClick={() => {
+                    sfx.tap();
+                    void actions.doubt(you?.doubting === opened.id ? null : opened.id).catch(() => {});
+                  }}
+                >
+                  {you?.doubting === opened.id ? "You doubt them" : "I doubt them"} · {opened.doubt ?? 0}% of the room
+                </button>
+              </div>
+            )}
+            <button type="button" className="btn btn-primary tap" onClick={() => setOpen(null)}>
+              Close card
+            </button>
+          </div>
         </div>
       )}
 
@@ -591,6 +591,14 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
         </div>
       )}
     </main>
+  );
+}
+
+function Glyph({ d }: { d: string }) {
+  return (
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.600" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={d} />
+    </svg>
   );
 }
 
@@ -768,7 +776,7 @@ export function Verdict({ room, actions }: Props) {
       <div className="mt-3 flex items-center gap-3">
         <span
           className="flex shrink-0 items-center rounded-[8px] px-3 py-1.5 text-[13px] font-bold tracking-[0.06em] text-white"
-          style={{ background: r.caught ? "#F0385A" : "#4c3d8f", animation: "stampIn 420ms cubic-bezier(.2,1.4,.4,1) both", transformOrigin: "left center" }}
+          style={{ background: r.caught ? "#F0385A" : "#4c3d8f", animation: "riseIn 380ms ease-out both" }}
         >
           {r.caught ? "CULPRIT CAUGHT" : "CULPRIT ESCAPED"}
         </span>

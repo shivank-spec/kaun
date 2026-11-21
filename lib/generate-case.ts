@@ -317,7 +317,17 @@ function fallbackFor(players?: { id: string; name: string }[], culpritAmong?: st
         ],
       };
     }
-    const tpl = oldInnocents[i % oldInnocents.length];
+    // More players than written characters: the extras get their own job and story.
+    const extras = [
+      { role: "Night-shift security guard", public_alibi: "was at the front desk signing in a courier the whole time" },
+      { role: "Intern", public_alibi: "was in the pantry on a long phone call with home" },
+      { role: "Visiting auditor", public_alibi: "was in the meeting room going through last month's paperwork" },
+      { role: "Driver", public_alibi: "was waiting in the car park with the engine running" },
+    ];
+    const tpl =
+      i < oldInnocents.length
+        ? oldInnocents[i]
+        : { ...oldInnocents[i % oldInnocents.length], ...extras[(i - oldInnocents.length) % extras.length] };
     // Only point suspicion at real people, never at a bot.
     const other = players.filter(
       (x) => x.id !== p.id && x.id !== culprit.id && (!culpritAmong || culpritAmong.includes(x.id)),

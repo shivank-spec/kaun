@@ -724,7 +724,7 @@ export default function Solo() {
       <div className="mt-3 flex items-center gap-3">
         <span
           className="flex shrink-0 items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-[13px] font-bold tracking-[0.06em] text-white"
-          style={{ background: v.correct ? "#F0385A" : "#2a3350", animation: "stampIn 420ms cubic-bezier(.2,1.4,.4,1) both", transformOrigin: "left center" }}
+          style={{ background: v.correct ? "#F0385A" : "#2a3350", animation: "riseIn 380ms ease-out both" }}
         >
           {v.correct ? "CULPRIT CAUGHT" : "CULPRIT ESCAPED"}
         </span>
