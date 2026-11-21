@@ -20,9 +20,8 @@ const gemini = () =>
     baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
     maxRetries: 0,
   });
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
-// Off until a model is proven fast on the live site (see /api/health).
-const GEMINI_ON = false;
+const GEMINI_LITE = "gemini-2.5-flash-lite";
+const GEMINI_FLASH = "gemini-2.5-flash";
 
 export const openai = () =>
   new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 0 });
@@ -32,16 +31,10 @@ const SMALL = "openai/gpt-oss-20b"; // fast: suspect replies
 const ALT = "qwen/qwen3.8-27b"; // separate quota
 const OPENAI_MODEL = "gpt-4o-mini";
 
-/** "case" prefers the strongest model; "chat" spreads load over the lighter ones. */
-const ORDER = {
-  case: [BIG, ALT, SMALL],
-  chat: [SMALL, ALT, BIG],
-} as const;
-
 interface JsonCall {
   system: string;
   user: string;
-  kind?: keyof typeof ORDER;
+  kind?: "case" | "chat";
   temperature?: number;
   maxTokens?: number;
   groqTimeoutMs?: number;
@@ -74,31 +67,61 @@ async function callJSON(
   return JSON.parse(text);
 }
 
-// Rotate the starting model for chat so load is shared evenly across quotas.
+type Provider = { name: string; run: (c: JsonCall) => Promise<unknown> };
+
+const viaGroq = (model: string): Provider => ({
+  name: model,
+  run: (c) => callJSON(groq(), model, c, c.groqTimeoutMs ?? 8000, true),
+});
+const viaGemini = (model: string, timeout: number): Provider => ({
+  name: model,
+  run: (c) => callJSON(gemini(), model, c, timeout, false),
+});
+
+/**
+ * Every free quota we have, as separate buckets. Groq limits tokens per minute
+ * per model; Gemini limits requests per minute per model. Spreading calls
+ * across all of them multiplies how many people can play at once.
+ */
+function providers(kind: "case" | "chat"): Provider[] {
+  const g = process.env.GROQ_API_KEY ? true : false;
+  const m = process.env.GEMINI_API_KEY ? true : false;
+  const list: (Provider | false)[] =
+    kind === "case"
+      ? [
+          g && viaGroq(BIG),
+          m && viaGemini(GEMINI_FLASH, 12000),
+          g && viaGroq(ALT),
+          m && viaGemini(GEMINI_LITE, 12000),
+          g && viaGroq(SMALL),
+        ]
+      : [
+          g && viaGroq(SMALL),
+          m && viaGemini(GEMINI_LITE, 5000),
+          g && viaGroq(ALT),
+          m && viaGemini(GEMINI_FLASH, 5000),
+          g && viaGroq(BIG),
+        ];
+  return list.filter(Boolean) as Provider[];
+}
+
+// Chat calls start from a different bucket each time so load is shared evenly.
 let turn = 0;
 
-/** Ask for JSON. Tries each Groq model in turn, then OpenAI. Throws only if all fail. */
+/** Ask for JSON. Walks the buckets until one answers. Throws only if all fail. */
 export async function chatJSON(c: JsonCall): Promise<unknown> {
   const kind = c.kind ?? "case";
-  let models: string[] = [...ORDER[kind]];
-  if (kind === "chat") {
-    const shift = turn++ % 2; // alternate between the two light models
-    models = [models[shift], models[1 - shift], models[2]];
+  let list = providers(kind);
+  if (kind === "chat" && list.length > 1) {
+    const rotating = list.slice(0, -1); // keep the big model as the last resort
+    const shift = turn++ % rotating.length;
+    list = [...rotating.slice(shift), ...rotating.slice(0, shift), list[list.length - 1]];
   }
-  if (process.env.GEMINI_API_KEY && GEMINI_ON) {
+  for (const p of list) {
     try {
-      return await callJSON(gemini(), GEMINI_MODEL, c, 5000, false);
+      return await p.run(c);
     } catch (e) {
-      console.warn("[ai] gemini failed:", (e as Error).message.slice(0, 140));
-    }
-  }
-  if (process.env.GROQ_API_KEY) {
-    for (const model of models) {
-      try {
-        return await callJSON(groq(), model, c, c.groqTimeoutMs ?? 8000, true);
-      } catch (e) {
-        console.warn(`[ai] ${model} failed:`, (e as Error).message.slice(0, 140));
-      }
+      console.warn(`[ai] ${p.name} failed:`, (e as Error).message.slice(0, 140));
     }
   }
   if (!process.env.OPENAI_API_KEY) throw new Error("all AI providers failed");
@@ -118,7 +141,7 @@ export async function probe() {
     }
   };
   const out: Record<string, string> = {};
-  for (const m of ["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.0-flash"]) {
+  for (const m of [GEMINI_LITE, GEMINI_FLASH]) {
     out[m] = process.env.GEMINI_API_KEY
       ? await test(async () => {
           // Raw fetch so we can read Google's own error text.
