@@ -173,6 +173,9 @@ export interface RoomReveal {
   /** Exactly what the narrator reads. Its audio is prepared during the discussion. */
   narration: string;
   roast: string;
+  /** Why the culprit did it, and how. Always shown at the end. */
+  why?: string;
+  how?: string;
   votes: { voterId: string; voterName: string; targetId: string; targetName: string }[];
 }
 

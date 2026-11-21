@@ -290,6 +290,8 @@ function buildReveal(file: CaseFile, players: PlayerRow[], fx?: RoomSettings["fx
     story: caught ? file.ending_caught : `${framed}${noVerdict}${file.ending_escaped}`,
     narration: narrationOf(file, caught),
     roast: file.roast,
+    why: file.motive,
+    how: file.method,
     votes: players
       .filter((p) => p.vote)
       .map((p) => ({

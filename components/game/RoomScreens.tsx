@@ -1167,6 +1167,18 @@ export function Verdict({ room, actions }: Props) {
           </span>
         </div>
         <p className="m-0 mt-3 text-[16px] font-medium leading-snug">{full ? r.story : firstSentence(r.narration || r.story)}</p>
+        {r.why && (
+          <p className="m-0 mt-2.5 text-[14.5px] leading-snug text-[#E3E8F2]">
+            <span className="font-semibold text-cyan">Why {first(r.culpritName)} did it: </span>
+            {r.why}
+          </p>
+        )}
+        {full && r.how && (
+          <p className="m-0 mt-2 text-[14.5px] leading-snug text-[#E3E8F2]">
+            <span className="font-semibold text-cyan">How: </span>
+            {r.how}
+          </p>
+        )}
         {full && <p className="m-0 mt-2 text-[14px] italic leading-snug text-mist">“{r.roast}”</p>}
         <button type="button" className="tap label mt-2.5 border-0 bg-transparent p-0 text-cyan underline" onClick={() => setFull((f) => !f)}>
           {full ? "Show less" : "Read the full story"}
