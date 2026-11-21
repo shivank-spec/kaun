@@ -189,7 +189,7 @@ function Room({ code, mockStatus }: { code: string; mockStatus: RoomStatus | nul
       {mockStatus && (
         <button
           type="button"
-          className="fixed bottom-1 right-1 z-50 rounded bg-black/70 px-2 py-1 text-[10px] text-[var(--k-yellow)]"
+          className="fixed top-0 left-1/2 -translate-x-1/2 z-50 rounded-b bg-black/70 px-2 py-0.5 text-[10px] text-[var(--k-yellow)]"
           onClick={() => {
             const q = new URLSearchParams(search.toString());
             q.set("mock", MOCK_STATUSES[(MOCK_STATUSES.indexOf(mockStatus) + 1) % MOCK_STATUSES.length]);
