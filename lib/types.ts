@@ -134,6 +134,8 @@ export type RoomStatus =
   | "reveal";
 
 export interface RoomSettings {
+  /** The innocent power each player held last time, so they get a different one. */
+  lastPowers?: Record<string, string>;
   setting: string; // "Kolkata" | "This hackathon room" | custom 3 words
   tone: Tone;
   demo: boolean; // ?demo=true speedrun

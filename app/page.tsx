@@ -100,7 +100,7 @@ export default function Home() {
       const res = await fetch("/api/room", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, setting, tone, demo, difficulty }),
+        body: JSON.stringify({ name, setting, tone, demo, difficulty, lastPower: localStorage.getItem("kaun.power") }),
         signal: AbortSignal.timeout(12000), // never leave the button frozen
       });
       const data = await res.json();

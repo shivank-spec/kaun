@@ -69,3 +69,12 @@ test("room stories never call a player he or she", async () => {
     "Vikram was caught and confessed, noting their stress. The paper was found in their bag. They were tired; they're done. Ask them.",
   );
 });
+
+test("an escaped culprit is never described as arrested", async () => {
+  const { escapedEnding } = await import("../lib/rooms");
+  const file = { ...FALLBACK_CASES[0], ending_escaped: "None – Asha was arrested on the spot." };
+  assert.doesNotMatch(escapedEnding(file), /arrest|None/);
+  assert.match(escapedEnding(file), /walked away free/);
+  const fine = { ...FALLBACK_CASES[0], ending_escaped: "They slipped out through the side door and were never seen again." };
+  assert.equal(escapedEnding(fine), fine.ending_escaped);
+});

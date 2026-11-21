@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { chatJSON } from "./ai";
 import { generateCase, recastForPlayers } from "./generate-case";
 import { drawCase } from "./pool";
+import { botNamesFor, botsNeeded } from "./bots";
 import { store, type PlayerRow, type RoomRow } from "./store";
 import { narrate } from "./voice";
 import type {
@@ -38,9 +39,7 @@ function timings(settings: RoomSettings) {
   return { ...SECONDS.normal, discuss: DISCUSS_BY_LEVEL[settings.difficulty ?? "medium"] };
 }
 const MIN_HUMANS = 2; // with 2 humans an AI bot fills the third seat
-const MIN_SEATS = 6; // a room always has at least six suspects
-const MAX_BOTS = 4;
-const BOT_NAMES = ["Asha", "Vikram", "Meera", "Kabir", "Zoya"];
+// A room always has at least six suspects: see botsNeeded.
 const MAX_PLAYERS = 8;
 const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O
 
@@ -59,12 +58,14 @@ function cleanSettings(raw: Partial<RoomSettings> | undefined, base?: RoomSettin
     raw?.difficulty === "easy" || raw?.difficulty === "hard" || raw?.difficulty === "medium"
       ? raw.difficulty
       : (base?.difficulty ?? "medium");
-  return { tone, setting, demo: raw?.demo ?? base?.demo ?? false, difficulty, pausedMs: null, fx: null };
+  return { tone, setting, demo: raw?.demo ?? base?.demo ?? false, difficulty, pausedMs: null, fx: null, lastPowers: base?.lastPowers };
 }
 
 /* ---------------- create / join ---------------- */
 
-export async function createRoom(name: unknown, settings?: Partial<RoomSettings>) {
+const knownPower = (v: unknown): v is InnocentPower => INNOCENT_POWERS.includes(v as InnocentPower);
+
+export async function createRoom(name: unknown, settings?: Partial<RoomSettings>, lastPower?: unknown) {
   const hostName = cleanName(name);
   if (!hostName) throw new GameError("Enter your name");
   const db = store();
@@ -89,12 +90,13 @@ export async function createRoom(name: unknown, settings?: Partial<RoomSettings>
       vote: null,
       joined_at: new Date().toISOString(),
     });
+    if (knownPower(lastPower)) await db.updateRoomIf(code, "lobby", { settings: { ...cleanSettings(settings), lastPowers: { [playerId]: lastPower } } });
     return { code, playerId };
   }
   throw new GameError("Could not create a room, try again", 500);
 }
 
-export async function joinRoom(codeRaw: string, name: unknown) {
+export async function joinRoom(codeRaw: string, name: unknown, lastPower?: unknown) {
   const code = codeRaw.toUpperCase();
   const db = store();
   const room = await db.getRoom(code);
@@ -117,6 +119,9 @@ export async function joinRoom(codeRaw: string, name: unknown) {
     vote: null,
     joined_at: new Date().toISOString(),
   });
+  if (knownPower(lastPower)) {
+    await db.updateRoomIf(code, "lobby", { settings: { ...room.settings, lastPowers: { ...room.settings.lastPowers, [playerId]: lastPower } } });
+  }
   return { playerId };
 }
 
@@ -205,8 +210,9 @@ export async function startRoom(
   try {
     // Fill empty seats with AI bots so two people can still play a full room.
     const taken = new Set(players.map((p) => p.name.toLowerCase().split(" ")[0]));
-    const botNames = BOT_NAMES.filter((n) => !taken.has(n.toLowerCase()));
-    for (let i = 0; players.length < MIN_SEATS && players.filter((p) => p.is_bot).length < MAX_BOTS; i++) {
+    const botNames = botNamesFor(code, [...taken]);
+    const want = botsNeeded(humans.length);
+    for (let i = 0; players.filter((p) => p.is_bot).length < want; i++) {
       const bot: PlayerRow = {
         id: crypto.randomUUID(),
         room_code: code,
@@ -241,14 +247,24 @@ export async function startRoom(
     // The story may have been written for someone else, so nobody is a he or a she.
     file = neutralCase(file);
     // Deal the innocent powers round the table, so friends hold different ones each round.
-    const deal = [...INNOCENT_POWERS].sort(() => Math.random() - 0.5);
-    const spin = crypto.randomInt(deal.length);
+    // Nobody gets the power they held last time, and the table is as mixed as possible.
+    const last = room.settings.lastPowers ?? {};
+    const dealt: Record<string, InnocentPower> = {};
+    const count: Record<string, number> = {};
+    for (const p of players) {
+      const options = INNOCENT_POWERS.filter((k) => k !== last[p.id]).sort(() => Math.random() - 0.5);
+      const pick = options.sort((a, b) => (count[a] ?? 0) - (count[b] ?? 0))[0];
+      dealt[p.id] = pick;
+      count[pick] = (count[pick] ?? 0) + 1;
+    }
+    const lastPowers = Object.fromEntries(humans.map((p) => [p.id, p.id === file.culprit_id ? (last[p.id] ?? "") : dealt[p.id]]));
     await Promise.all(
-      players.map((p, i) => db.updatePlayer(p.id, { card: buildCard(file, p.id, deal[(i + spin) % deal.length]), vote: null, doubt: null })),
+      players.map((p) => db.updatePlayer(p.id, { card: buildCard(file, p.id, dealt[p.id]), vote: null, doubt: null })),
     );
     const t = timings(merged);
     await db.updateRoomIf(code, "generating", {
       status: "briefing",
+      settings: { ...merged, lastPowers },
       case_file: file,
       phase_ends_at: inSeconds(t.briefing),
     });
@@ -263,7 +279,18 @@ export async function startRoom(
 
 /** The narrator's script for an ending. Both are known from the start of the round. */
 const narrationOf = (file: CaseFile, caught: boolean) =>
-  `${caught ? file.ending_caught : file.ending_escaped} ${file.roast}`;
+  `${caught ? file.ending_caught : escapedEnding(file)} ${file.roast}`;
+
+/**
+ * The AI sometimes writes an "escaped" ending that still has the culprit
+ * arrested. If it does, say the plain truth instead.
+ */
+export function escapedEnding(file: CaseFile): string {
+  const name = file.suspects.find((s) => s.id === file.culprit_id)?.name.split(" ")[0] ?? "The culprit";
+  const text = (file.ending_escaped ?? "").trim();
+  const wrong = text.length < 20 || /\b(arrest|caught|confess|handcuff|jail|none|null|n\/a)/i.test(text);
+  return wrong ? `${name} did it, and walked away free. Nobody in the room worked it out in time.` : text;
+}
 
 function buildReveal(file: CaseFile, players: PlayerRow[], fx?: RoomSettings["fx"]): RoomReveal {
   const nameOf = (id: string | null) => players.find((p) => p.id === id)?.name ?? "nobody";
@@ -287,7 +314,7 @@ function buildReveal(file: CaseFile, players: PlayerRow[], fx?: RoomSettings["fx
     accusedId,
     accusedName: accusedId ? nameOf(accusedId) : null,
     caught,
-    story: caught ? file.ending_caught : `${framed}${noVerdict}${file.ending_escaped}`,
+    story: caught ? file.ending_caught : `${framed}${noVerdict}${escapedEnding(file)}`,
     narration: narrationOf(file, caught),
     roast: file.roast,
     why: file.motive,

@@ -6,6 +6,7 @@ import ShareCard from "@/components/ShareCard";
 import { HowTo, countRound } from "@/components/ui/HowTo";
 import { Avatar, Meter, Timer, TopBar, addXp, firstSentence, levelOf, readXp, ringOf, sfx } from "@/components/ui/kit";
 import { post } from "@/components/room/api";
+import { botNamesFor, botsNeeded } from "@/lib/bots";
 import type { Difficulty, PlayerCard, RoomView, Tone } from "@/lib/types";
 
 /* The multiplayer screens. Each one renders purely from the RoomView the
@@ -63,7 +64,7 @@ export function Join({
     setBusy(true);
     setError("");
     try {
-      const r = await post<{ playerId: string }>(`/api/room/${code}/join`, { name: clean });
+      const r = await post<{ playerId: string }>(`/api/room/${code}/join`, { name: clean, lastPower: localStorage.getItem("kaun.power") });
       localStorage.setItem("kaun.name", clean);
       onJoined(r.playerId, clean);
     } catch (e) {
@@ -117,7 +118,8 @@ export function Lobby({ room, actions }: Props) {
   const [copied, setCopied] = useState(false);
   const url = typeof window === "undefined" ? "" : `${window.location.origin}/room/${room.code}`;
   const humans = room.players.filter((p) => !p.isBot);
-  const aiSeats = Math.min(4, Math.max(0, 6 - humans.length));
+  const aiSeats = botsNeeded(humans.length);
+  const aiNames = botNamesFor(room.code, humans.map((p) => first(p.name)));
   const enough = humans.length >= 2;
   const hostName = room.players.find((p) => p.isHost)?.name ?? "the host";
 
@@ -196,7 +198,7 @@ export function Lobby({ room, actions }: Props) {
           </div>
         ))}
         {/* Empty seats are filled by AI suspects, so a room always has six. */}
-        {["Asha", "Vikram", "Meera", "Kabir"].slice(0, aiSeats).map((name, k) => (
+        {(room.players.some((p) => p.isBot) ? [] : aiNames.slice(0, aiSeats)).map((name, k) => (
           <div key={name} className="panel flex items-center gap-2.5 p-2.5" style={{ opacity: 0.82 }}>
             <Avatar name={name} index={humans.length + k} size={40} />
             <span className="min-w-0">
@@ -206,11 +208,6 @@ export function Lobby({ room, actions }: Props) {
             </span>
           </div>
         ))}
-        {room.players.length < 8 && (
-          <div className="flex min-h-[64px] items-center justify-center rounded-[14px] text-[13px] text-slate" style={{ boxShadow: "inset 0 0 0 1px rgba(130,180,230,.18)", borderStyle: "dashed" }}>
-            <span className="blink">Waiting for a friend</span>
-          </div>
-        )}
       </div>
 
       {host && (
@@ -513,6 +510,11 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
   const powers = card?.powers ?? {};
   const [cleared, setCleared] = useState<string | null>(null);
   const powersLeft = Object.values(powers).filter(Boolean).length;
+  // Remember which power this phone held, so the next room deals a different one.
+  useEffect(() => {
+    const held = (["detector", "clear", "extra"] as const).find((k) => powers[k]);
+    if (held) localStorage.setItem("kaun.power", held);
+  }, [powers.detector, powers.clear, powers.extra]); // eslint-disable-line react-hooks/exhaustive-deps
   const dark = room.blackoutUntil ? Math.max(0, Math.ceil((Date.parse(room.blackoutUntil) - Date.parse(room.serverNow)) / 1000)) : 0;
   const wasDark = useRef(false);
 
