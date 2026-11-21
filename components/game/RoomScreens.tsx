@@ -310,7 +310,7 @@ function RoleCard({ card, compact = false }: { card: PlayerCard; compact?: boole
             k="Your secret power · once"
             v={
               card.powers?.clear
-                ? "Background check: confirm one suspect who is innocent."
+                ? "Rule out two: cross two innocent suspects off your list."
                 : card.powers?.extra
                   ? "Double vote: make your vote count twice."
                   : "Lie detector: test one piece of evidence to see if it was planted."
@@ -784,8 +784,8 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
                 )}
                 {powers.clear && !cleared && (
                   <>
-                    <p className="display m-0 mt-2 text-[22px]">Background check</p>
-                    <p className="m-0 mt-1 text-[14px] leading-snug text-mist">Find out one suspect who definitely did not do it. Only you will know.</p>
+                    <p className="display m-0 mt-2 text-[22px]">Rule out two</p>
+                    <p className="m-0 mt-1 text-[14px] leading-snug text-mist">Cross two innocent suspects off your list at once. Only you will know who.</p>
                     <button type="button" className="btn btn-primary tap mt-3 !min-h-12" disabled={powerBusy} onClick={() => power("clear")}>
                       Run the check
                     </button>
@@ -793,8 +793,8 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
                 )}
                 {cleared && (
                   <>
-                    <p className="display m-0 mt-2 text-[22px]" style={{ color: "#B6F36A" }}>{label(room, cleared)} is innocent</p>
-                    <p className="m-0 mt-1 text-[14px] leading-snug text-mist">Confirmed by your background check. Cross them off your list.</p>
+                    <p className="display m-0 mt-2 text-[22px]" style={{ color: "#B6F36A" }}>{cleared}: innocent</p>
+                    <p className="m-0 mt-1 text-[14px] leading-snug text-mist">Confirmed. Cross them off your list. Tell the room, or keep it to yourself.</p>
                   </>
                 )}
                 {powers.extra && (
@@ -890,9 +890,9 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
         <div className="scrim !justify-center px-6" role="alert" style={{ zIndex: 55, background: "#000" }}>
           <div className="text-center">
             <p className="eyebrow blink m-0" style={{ color: "#F0385A" }}>Blackout</p>
-            <p className="display m-0 mt-3 text-[clamp(34px,11vw,48px)]">Someone cut the lights</p>
+            <p className="display m-0 mt-3 text-[clamp(34px,11vw,48px)]">The culprit cut the lights</p>
             <p className="mono m-0 mt-4 text-[40px] text-[#F0385A]">{dark}</p>
-            <p className="label mt-3">Who just did that? Look at their faces.</p>
+            <p className="label mt-3">They are destroying a piece of evidence right now.</p>
           </div>
         </div>
       )}

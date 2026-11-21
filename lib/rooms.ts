@@ -494,10 +494,11 @@ export async function playPower(
     // Name one suspect who certainly did not do it.
     const safe = players.filter((p) => p.id !== me.id && p.id !== room.case_file!.culprit_id);
     if (!safe.length) throw new GameError("Nobody to check");
-    const pick = safe[crypto.randomInt(safe.length)];
-    await saveFx({ ...fx, notes: [...(fx.notes ?? []), `${me.name} ran a background check`] });
+    // Two names when the room is big enough, so the power really narrows the list.
+    const picks = [...safe].sort(() => Math.random() - 0.5).slice(0, safe.length >= 4 ? 2 : 1);
+    await saveFx({ ...fx, notes: [...(fx.notes ?? []), `${me.name} ruled out two suspects`] });
     await spend("clear");
-    return { ok: true, clearedName: pick.name };
+    return { ok: true, clearedName: picks.map((p) => p.name.split(" ")[0]).join(" and ") };
   }
 
   if (power === "extra") {
