@@ -78,9 +78,27 @@ export async function POST(req: Request) {
   const hash = crypto.createHash("sha1").update(`${noir ? "n" : "d"}:${text}`).digest("hex");
   const db = database();
 
-  if (db) {
+  const cached = async () => {
+    if (!db) return null;
     const { data } = await db.from("tts_cache").select("audio_b64").eq("hash", hash).maybeSingle();
-    if (data?.audio_b64) return wav(Buffer.from(data.audio_b64, "base64"), "cache");
+    return data ?? null;
+  };
+
+  const hit = await cached();
+  if (hit?.audio_b64) return wav(Buffer.from(hit.audio_b64, "base64"), "cache");
+
+  // Claim the job. If another phone in the room already claimed it, wait for
+  // its result instead of paying for the same narration again.
+  if (db) {
+    const { error } = await db.from("tts_cache").insert({ hash, audio_b64: "" });
+    if (error) {
+      for (let i = 0; i < 22; i++) {
+        await new Promise((r) => setTimeout(r, 1000));
+        const row = await cached();
+        if (!row) break; // the other request failed and released the claim
+        if (row.audio_b64) return wav(Buffer.from(row.audio_b64, "base64"), "cache");
+      }
+    }
   }
 
   const errors: string[] = [];
@@ -96,6 +114,7 @@ export async function POST(req: Request) {
       errors.push((e as Error).message);
     }
   }
+  if (db) await db.from("tts_cache").delete().eq("hash", hash).eq("audio_b64", "");
   console.warn("[tts]", errors.join(" | "));
   return NextResponse.json({ error: "Voice unavailable", detail: errors }, { status: 503 });
 }
