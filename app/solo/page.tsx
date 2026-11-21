@@ -11,6 +11,7 @@ import {
   Pips,
   TopBar,
   XpCard,
+  firstSentence,
   addXp,
   readXp,
   ringOf,
@@ -79,6 +80,7 @@ export default function Solo() {
   const [xp, setXp] = useState({ gained: 0, total: 0 });
   const [voice, setVoice] = useState<"idle" | "loading" | "playing">("idle");
   const [listening, setListening] = useState(false);
+  const [full, setFull] = useState(false);
   const startedAt = useRef(0);
   const audio = useRef<HTMLAudioElement | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -94,6 +96,7 @@ export default function Solo() {
     setUsed(0);
     setPick("");
     setVerdict(null);
+    setFull(false);
     setSheet(null);
     setToast(null);
     setVoice("idle");
@@ -758,11 +761,11 @@ export default function Solo() {
             ))}
           </span>
         </div>
-        <p className="m-0 mt-3 text-[14.5px] leading-snug">{v.story}</p>
-        <p className="m-0 mt-2 text-[13.5px] italic leading-snug text-mist">“{v.roast}”</p>
-        <p className="label m-0 mt-2">
-          {voice === "loading" ? "Narrator is clearing his throat" : voice === "playing" ? "Narrator" : "Narrator · tap to hear the verdict"}
-        </p>
+        <p className="m-0 mt-3 text-[16px] font-medium leading-snug">{full ? v.story : firstSentence(v.story)}</p>
+        {full && <p className="m-0 mt-2 text-[14px] italic leading-snug text-mist">“{v.roast}”</p>}
+        <button type="button" className="tap label mt-2.5 border-0 bg-transparent p-0 text-cyan underline" onClick={() => setFull((f) => !f)}>
+          {full ? "Show less" : "Read the full story"}
+        </button>
       </div>
 
       <div className="mt-3 grid grid-cols-3 gap-2">

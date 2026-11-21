@@ -142,7 +142,7 @@ const toneGuide = (tone: Tone) =>
 const COMMON_RULES = `
 RULES
 - REALISM: this must read like a real case file, not a joke. Choose a serious, high-stakes, non-violent crime: a jewel or art theft, a swapped forgery, a leaked exam paper or tender bid, stolen source code or client data, a wiped server, embezzlement, a sabotaged machine or race, a doctored document, blackmail, an inside job. Never a stolen snack or sweet. Nobody is hurt or killed.
-- Give it real-world texture: exact clock times, a rupee value or what is at stake, named rooms, and forensic-style evidence (CCTV timestamps, access-card logs, phone records, fingerprints, transaction IDs, a torn receipt, tyre marks, metadata).
+- Give it real-world texture: exact clock times, a rupee value or what is at stake, named rooms, and everyday evidence anyone understands (a camera recording, a door-card swipe, a phone call, a fingerprint, a receipt, a muddy footprint, a witness).
 - Suspects are believable adults with real jobs and real motives (debt, a passed-over promotion, a rival's offer, a cover-up). Titles are short and sound like a case file. Vary them: do not always use the word "Heist" (e.g. "The Camac Street Switch", "Lot 47", "Night Shift at Gate 3").
 - "facts" states the case in three short plain lines a child could follow: "what" was taken or done (under 10 words), "when" (a time window), "where" (the exact spot).
 - CLARITY: one crime, one moment, one place. Every clue is a single plain sentence under 18 words. No jargon.
@@ -152,7 +152,8 @@ RULES
 - "culprit_objective" is a specific false claim the culprit must convince others of, e.g. "Convince everyone the CCTV was already down at 9:40 pm."
 - "innocent_secret" is a private, non-criminal thing the person would rather hide (a secret job interview, a hidden debt, meeting someone they should not, breaking a workplace rule). It explains why they looked suspicious.
 - "intro" (2-3 sentences) sets the scene without naming the culprit.
-- "ending_caught" (3-4 sentences) narrates how the culprit did it and how the evidence caught them. "ending_escaped" (3-4 sentences) narrates how the culprit got away with it. Both name the culprit and explain the method.
+- "ending_caught" and "ending_escaped" are 2 short sentences each. The first sentence says, in plain words, who did it and how. The second says how they were caught, or how they got away.
+- PLAIN WORDS: write so a 12-year-old follows it on first read. No technical jargon at all: never say VPN, MAC address, checksum, exfiltrate, metadata, hash, server log, firmware. Say "the door camera", "her phone records", "his fingerprint", "the receipt".
 - "roast" is one dry, cutting line about the culprit, the kind a detective says while closing the file.
 - LANGUAGE: write everything in plain English only. No Hindi, Bengali or Hinglish words anywhere (names of people and places are fine).
 - Keep every string tight: under 30 words each. No markdown. Output ONLY the complete JSON object with every key present.`;

@@ -180,6 +180,12 @@ export function Loading({ title }: { title?: string }) {
   );
 }
 
+/** The first sentence of a longer text, for a one-line summary. */
+export function firstSentence(text: string) {
+  const m = /^(.*?[.!?])(\s|$)/.exec(text.trim());
+  return (m ? m[1] : text).trim();
+}
+
 /* ---------- XP: a small local progression so every round feels like it counted ---------- */
 
 const RANKS = ["Rookie", "Constable", "Analyst", "Inspector", "Detective", "Chief"];

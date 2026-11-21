@@ -4,7 +4,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useRef, useState } from "react";
 import ShareCard from "@/components/ShareCard";
 import { HowTo, countRound } from "@/components/ui/HowTo";
-import { Avatar, Meter, Timer, TopBar, XpCard, addXp, readXp, ringOf, sfx } from "@/components/ui/kit";
+import { Avatar, Meter, Timer, TopBar, addXp, firstSentence, levelOf, readXp, ringOf, sfx } from "@/components/ui/kit";
 import { post } from "@/components/room/api";
 import type { Difficulty, PlayerCard, RoomView, Tone } from "@/lib/types";
 
@@ -691,6 +691,7 @@ export function Verdict({ room, actions }: Props) {
   const you = room.you;
   const [voice, setVoice] = useState<"idle" | "loading" | "playing">("loading");
   const [share, setShare] = useState(false);
+  const [full, setFull] = useState(false);
   const [busy, setBusy] = useState(false);
   const [xp, setXp] = useState({ gained: 0, total: 0 });
   const audio = useRef<HTMLAudioElement | null>(null);
@@ -787,24 +788,17 @@ export function Verdict({ room, actions }: Props) {
         </span>
       </div>
 
-      <p className="label mt-4 text-snow">Votes received</p>
+      <p className="label mt-4 text-snow">How the room voted</p>
       <div className="mt-1.5 flex shrink-0 flex-col gap-1.5">
         {tally.map(({ p, i, n }) => (
           <div key={p.id} className="grid grid-cols-[84px_1fr_18px] items-center gap-2.5 text-[13.5px]">
-            <span className="truncate font-semibold">{label(room, p.name)}</span>
+            <span className="truncate font-semibold">
+              {label(room, p.name)}
+              {p.isBot ? <span className="label ml-1 !text-[9px]">AI</span> : null}
+            </span>
             <Meter value={(n / max) * 100} color={n ? ringOf(i) : "transparent"} />
             <span className="mono text-right">{n}</span>
           </div>
-        ))}
-      </div>
-
-      <p className="label mt-3 text-snow">Who accused whom</p>
-      <div className="mt-1.5 flex shrink-0 flex-wrap gap-1.5">
-        {r.votes.map((v) => (
-          <span key={v.voterId} className="rounded-full px-2.5 py-1 text-[12px]" style={{ background: "rgba(255,255,255,.06)", boxShadow: `inset 0 0 0 1px ${v.targetId === r.culpritId ? "rgba(182,243,106,.55)" : "rgba(130,180,230,.22)"}` }}>
-            {label(room, v.voterName)}
-            {room.players.find((p) => p.id === v.voterId)?.isBot ? " (AI)" : ""} → <b>{label(room, v.targetName)}</b>
-          </span>
         ))}
       </div>
 
@@ -823,14 +817,16 @@ export function Verdict({ room, actions }: Props) {
             ))}
           </span>
         </div>
-        <p className="m-0 mt-3 text-[14.5px] leading-snug">{r.story}</p>
-        <p className="m-0 mt-2 text-[13.5px] italic leading-snug text-mist">“{r.roast}”</p>
-        <p className="label m-0 mt-2">{voice === "loading" ? "Narrator is clearing his throat" : "Narrator · tap to hear the verdict"}</p>
+        <p className="m-0 mt-3 text-[16px] font-medium leading-snug">{full ? r.story : firstSentence(r.narration || r.story)}</p>
+        {full && <p className="m-0 mt-2 text-[14px] italic leading-snug text-mist">“{r.roast}”</p>}
+        <button type="button" className="tap label mt-2.5 border-0 bg-transparent p-0 text-cyan underline" onClick={() => setFull((f) => !f)}>
+          {full ? "Show less" : "Read the full story"}
+        </button>
       </div>
 
-      <div className="mt-3">
-        <XpCard gained={xp.gained} total={xp.total || readXp()} note={youWon ? "Round won" : "Round lost"} />
-      </div>
+      <p className="label mt-3 text-center">
+        +{xp.gained} XP · Level {levelOf(xp.total || readXp()).level} {levelOf(xp.total || readXp()).rank}
+      </p>
 
       <div className="mt-auto flex shrink-0 flex-col gap-2.5 pt-4">
         {you?.isHost ? (
