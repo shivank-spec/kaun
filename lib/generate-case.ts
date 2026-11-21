@@ -108,16 +108,18 @@ export function validateCase(c: CaseFile, mode: "solo" | "room"): string | null 
 /* ------------------------------------------------------------------ */
 
 const KOLKATA_SPOTS = [
-  "KC Das sweet shop on Esplanade",
-  "the Indian Coffee House on College Street",
-  "a Durga Puja pandal in Kumartuli",
-  "the Park Street tram at midnight",
-  "a phuchka stall outside Victoria Memorial",
-  "the members' stand at Eden Gardens",
-  "New Market on a Sunday evening",
-  "a houseboat adda on the Hooghly near Howrah Bridge",
-  "a wedding at a North Kolkata rajbari",
-  "Flurys tea room on Park Street",
+  "a five-star hotel on Park Street during a wedding reception",
+  "the tea auction house on N.S. Road, minutes before a record lot goes under the hammer",
+  "a private bank's vault floor in Dalhousie Square after closing time",
+  "a jewellery showroom on Camac Street on the night of a private viewing",
+  "a tech startup's office in Salt Lake Sector V the night before its funding round",
+  "the paintings gallery at Victoria Memorial after the last visitor has left",
+  "the Royal Calcutta Turf Club stables on the morning of the Derby",
+  "the air cargo terminal at Kolkata airport during the night shift",
+  "the media box at Eden Gardens during a sold-out match",
+  "a container yard at Kolkata Port during a customs inspection",
+  "a film set at a Tollygunge studio on the last day of the shoot",
+  "an exam board's strongroom on College Street the night before the papers go out",
 ];
 
 function resolveSetting(raw?: string): string {
@@ -126,31 +128,35 @@ function resolveSetting(raw?: string): string {
     return KOLKATA_SPOTS[Math.floor(Math.random() * KOLKATA_SPOTS.length)];
   }
   if (/hackathon/i.test(s)) {
-    return "the Vibe Coders Hackathon floor at AIC Techno, Kolkata, run by Calcutta AI Club (laptops, extension cords, the Wi-Fi router, the samosa and McDonald's table, the judges' desk)";
+    return "the Vibe Coders Hackathon floor at AIC Techno, Kolkata, run by Calcutta AI Club, in the last hour before submissions close (laptops, the judges' desk and score sheets, the prize cheque, the Wi-Fi rack, a sponsor's prototype on display)";
   }
   return s;
 }
 
 const toneGuide = (tone: Tone) =>
   tone === "noir"
-    ? "Narration style: dry, witty English noir detective voice."
-    : "Narration style: over-the-top Indian TV crime-show drama in Hinglish (Roman script Hindi mixed with English), e.g. 'Kuch toh gadbad hai, Daya.' Suspects speak natural Hinglish.";
+    ? "Narration style: a dry, world-weary noir detective. Sparse, precise, a little bitter."
+    : "Narration style: a gripping true-crime documentary narrator. Tense, cinematic, serious.";
 
 const COMMON_RULES = `
 RULES
-- The crime is petty and funny (stolen sweets, missing trophy, unplugged router). Never violent, never dark, nothing offensive.
+- REALISM: this must read like a real case file, not a joke. Choose a serious, high-stakes, non-violent crime: a jewel or art theft, a swapped forgery, a leaked exam paper or tender bid, stolen source code or client data, a wiped server, embezzlement, a sabotaged machine or race, a doctored document, blackmail, an inside job. Never a stolen snack or sweet. Nobody is hurt or killed.
+- Give it real-world texture: exact clock times, a rupee value or what is at stake, named rooms, and forensic-style evidence (CCTV timestamps, access-card logs, phone records, fingerprints, transaction IDs, a torn receipt, tyre marks, metadata).
+- Suspects are believable adults with real jobs and real motives (debt, a passed-over promotion, a rival's offer, a cover-up). Titles are short and sound like a case file, e.g. "The Camac Street Switch".
 - Decide the culprit, motive, method and timeline FIRST. Then write everything else to be consistent with them.
-- "crime_verb" finishes the sentence "Find who ..." in under 8 words, e.g. "stole the last rosogolla".
-- "alibi_hole" is the one concrete fact that breaks the culprit's public_alibi.
-- "culprit_objective" is a specific false claim the culprit must convince others of, e.g. "Convince everyone the lights went out at 8:00 pm."
+- "crime_verb" finishes the sentence "Find who ..." in under 8 words, e.g. "swapped the necklace for a fake".
+- "alibi_hole" is the one concrete, checkable fact that breaks the culprit's public_alibi.
+- "culprit_objective" is a specific false claim the culprit must convince others of, e.g. "Convince everyone the CCTV was already down at 9:40 pm."
+- "innocent_secret" is a private, non-criminal thing the person would rather hide (a secret job interview, a hidden debt, meeting someone they should not, breaking a workplace rule). It explains why they looked suspicious.
 - "intro" (2-3 sentences) sets the scene without naming the culprit.
-- "ending_caught" (3-4 sentences) narrates how the culprit did it and was caught. "ending_escaped" (3-4 sentences) narrates how the culprit fooled everyone. Both name the culprit and explain the method.
-- "roast" is one savage but friendly line about the culprit.
-- Keep every string short and punchy. No markdown. Output ONLY the JSON object.`;
+- "ending_caught" (3-4 sentences) narrates how the culprit did it and how the evidence caught them. "ending_escaped" (3-4 sentences) narrates how the culprit got away with it. Both name the culprit and explain the method.
+- "roast" is one dry, cutting line about the culprit, the kind a detective says while closing the file.
+- LANGUAGE: write everything in plain English only. No Hindi, Bengali or Hinglish words anywhere (names of people and places are fine).
+- Keep every string tight. No markdown. Output ONLY the JSON object.`;
 
 function soloPrompt(setting: string, tone: Tone) {
   return {
-    system: `You design airtight mini-mysteries for a 3-minute detective game. ${toneGuide(tone)}
+    system: `You are a crime writer designing airtight, realistic case files for a 3-minute detective game. ${toneGuide(tone)}
 Return ONE JSON object with exactly these keys:
 {"title","setting","crime","crime_verb","intro",
  "suspects":[{"id":"s1","name","role","persona","speaking_style","public_alibi","innocent_secret"} x4 with ids s1,s2,s3,s4],
@@ -158,11 +164,11 @@ Return ONE JSON object with exactly these keys:
  "clues":[{"id":"c1","text","held_by","points_to","is_red_herring"} x5 with ids c1..c5],
  "alibi_hole","culprit_objective","ending_caught","ending_escaped","roast"}
 ${COMMON_RULES}
-- Exactly 4 suspects with everyday Indian (mostly Bengali/Kolkata) names and very different personalities.
+- Exactly 4 suspects with realistic Indian (mostly Bengali/Kolkata) names, distinct jobs and distinct ways of speaking.
 - Exactly 5 clues: 3 TRUE (is_red_herring=false) and 2 RED HERRINGS (is_red_herring=true).
 - Each TRUE clue: points_to = culprit_id, and held_by = a DIFFERENT innocent suspect (it is something that suspect saw or knows). The three together prove the culprit.
 - Each RED HERRING: points_to an innocent suspect, held_by a different suspect, and is fully explained by the accused suspect's innocent_secret.
-- innocent_secret is embarrassing but harmless. The culprit's innocent_secret field holds a cover story they use.
+- The culprit's innocent_secret field holds the cover story they use.
 - Pick the culprit at random among s1..s4. Do not always pick the same position.`,
     user: `Setting: ${setting}. Random seed: ${Math.random().toString(36).slice(2, 8)}. Write the case.`,
   };
@@ -179,7 +185,7 @@ function roomPrompt(
     ? `The culprit MUST be one of these ids, chosen at random: ${culpritAmong.join(", ")}.`
     : "Pick the culprit at random from the players.";
   return {
-    system: `You design airtight mini-mysteries for a party game where REAL FRIENDS are the suspects and argue out loud for 2 minutes. ${toneGuide(tone)}
+    system: `You are a crime writer designing airtight, realistic case files for a party game where REAL FRIENDS are the suspects and argue out loud for 2 minutes. ${toneGuide(tone)}
 Return ONE JSON object with exactly these keys:
 {"title","setting","crime","crime_verb","intro",
  "suspects":[{"id","name","role","persona","speaking_style","public_alibi","innocent_secret","private_clues":[2 strings]} one per player, using the EXACT ids and names given],
@@ -189,13 +195,13 @@ Return ONE JSON object with exactly these keys:
  "hot_seat":{"player_id","question"}}
 ${COMMON_RULES}
 - ${culpritRule}
-- "hot_seat": pick one INNOCENT player and write one short, funny, slightly incriminating question addressed to them by name that they must answer out loud (e.g. "Priya, why was there powdered sugar on your kurta at 8:15?"). It must be explainable by their innocent_secret.
+- "hot_seat": pick one INNOCENT player and write one short, pointed, incriminating question addressed to them by name that they must answer out loud (e.g. "Priya, why does the access log show your card at the vault door at 9:42?"). It must be explainable by their innocent_secret.
 - "role" is what that player was doing at the scene. "public_alibi" is one line they can say out loud.
 - private_clues for an INNOCENT player: exactly 2 short first-person observations ("I saw ...", "I heard ..."). Across all innocent players, at least half of these observations must genuinely implicate the culprit; the rest are red herrings that make ANOTHER innocent player look suspicious for a harmless reason.
 - Make it a real puzzle: at most ONE clue in the whole case may name the culprit directly. Every other true clue must point at the culprit only through a detail (what they wore or carried, where they stood, a time that breaks their alibi) that players have to match up by talking. Red herrings may name people.
 - private_clues for the CULPRIT: exactly 2 short facts they can use to deflect blame onto specific other players (true-sounding and awkward for those players).
 - No clue may reveal the culprit outright with certainty by itself; players must combine clues.
-- Be playful about the players by name, never mean, nothing about looks, religion, caste or gender.`,
+- The players are real people: give them fictional jobs in the story, keep it respectful, nothing about looks, religion, caste or gender.`,
     user: `Setting: ${setting}. Players: ${list}. Random seed: ${Math.random().toString(36).slice(2, 8)}. Write the case.`,
   };
 }

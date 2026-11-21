@@ -101,7 +101,7 @@ export async function interrogate(input: AskInput): Promise<InterrogateResponse>
       moveBrief = `The detective CONFRONTS you with real evidence against you: "${evidence.text}". This is damning. Stammer, give a weak excuse that clashes with your alibi, and try to change the subject. Do not confess.`;
     } else if (evidence.points_to === me.id) {
       cleared = true;
-      moveBrief = `The detective CONFRONTS you with evidence that makes you look guilty: "${evidence.text}". Crack and admit your embarrassing secret, which explains it completely and proves you are innocent.`;
+      moveBrief = `The detective CONFRONTS you with evidence that makes you look guilty: "${evidence.text}". Crack and admit your private secret, which explains it completely and proves you are innocent.`;
     } else {
       moveBrief = `The detective shows you evidence that is about ${nameOf(evidence.points_to)}, not you: "${evidence.text}". ${
         isCulprit
@@ -114,7 +114,7 @@ export async function interrogate(input: AskInput): Promise<InterrogateResponse>
       moveBrief = `The detective is PRESSING you hard. Get visibly flustered and let one small detail slip that does not fit your alibi (${file.alibi_hole}). Still deny everything.`;
     } else {
       cleared = true;
-      moveBrief = `The detective is PRESSING you hard. Crack: admit your embarrassing secret, and tell them exactly what you witnessed${
+      moveBrief = `The detective is PRESSING you hard. Crack: admit your private secret, and tell them exactly what you witnessed${
         forcedClue ? `: "${forcedClue.text}"` : ""
       }.`;
     }
@@ -128,7 +128,7 @@ export async function interrogate(input: AskInput): Promise<InterrogateResponse>
     ? held.map((k) => `- [${k.id}] ${k.text} (this is about ${nameOf(k.points_to)})`).join("\n")
     : "- (nothing left to reveal)";
 
-  const system = `You are playing ONE suspect in a comedy detective game. Stay in character at all times.
+  const system = `You are playing ONE suspect being questioned by a detective in a realistic crime drama. Stay in character at all times.
 CASE: ${file.title}. ${file.crime} Setting: ${file.setting}.
 OTHER PEOPLE PRESENT: ${file.suspects.filter((s) => s.id !== me.id).map((s) => `${s.name} (${s.role})`).join(", ")}.
 
@@ -139,7 +139,7 @@ ${
     ? `SECRET: YOU DID IT. Motive: ${file.motive} How: ${file.method}
 You LIE and never confess. Push this false claim whenever you can: "${file.culprit_objective}"
 Your cover story: ${me.innocent_secret}`
-    : `You are INNOCENT. You are hiding something embarrassing but harmless: ${me.innocent_secret}`
+    : `You are INNOCENT. You are hiding something private but not criminal: ${me.innocent_secret}`
 }
 
 THINGS YOU WITNESSED:
@@ -147,7 +147,7 @@ ${heldList}
 
 THIS MOVE: ${moveBrief}
 
-RULES: Refer to people by name only, never by a code like s3 or c2. No dates or timestamps unless they are part of the story. Reply in 1-3 short sentences. ${tone === "noir" ? "English." : "Natural Hinglish (Roman script)."} Be funny and specific. Never break character, never mention being an AI, never narrate. Never state who the culprit is as a plain fact.
+RULES: Refer to people by name only, never by a code like s3 or c2. No dates or timestamps unless they are part of the story. Reply in 1-3 short sentences. Speak plain English only: no Hindi or Hinglish words. Sound like a real person under pressure: guarded, specific, with believable detail. No jokes. Never break character, never mention being an AI, never narrate. Never state who the culprit is as a plain fact.
 Return ONLY JSON: {"reply": string, "reveal_clue_id": string | null}`;
 
   const convo = history
@@ -183,9 +183,9 @@ Return ONLY JSON: {"reply": string, "reveal_clue_id": string | null}`;
     if (contradiction) {
       reply = `That... that proves nothing! I was... look, ${me.public_alibi.replace(/\.$/, "")}. Mostly. Can we talk about someone else?`;
     } else if (cleared && mode === "confront") {
-      reply = `Okay, okay! Write this down and tell nobody: "${me.innocent_secret}" Embarrassing, yes. Criminal, no.`;
+      reply = `All right. Off the record: ${me.innocent_secret} That is why I was not where I said. I had nothing to do with this.`;
     } else if (forcedClue) {
-      reply = `Theek hai, theek hai. I will tell you what I know: ${forcedClue.text}`;
+      reply = `Fine, fine. I will tell you what I know: ${forcedClue.text}`;
     } else if (isCulprit) {
       const lines = [
         `I already told you. ${me.public_alibi}`,
@@ -196,7 +196,7 @@ Return ONLY JSON: {"reply": string, "reveal_clue_id": string | null}`;
     } else {
       const lines = [
         `${me.public_alibi} That is all, I swear.`,
-        `Fine, write this down and tell nobody: "${me.innocent_secret}" Embarrassing, yes. Criminal, no.`,
+        `All right. Off the record: ${me.innocent_secret} That is the whole truth.`,
         `I have told you everything. Go and ask the others.`,
       ];
       reply = lines[turns % lines.length];

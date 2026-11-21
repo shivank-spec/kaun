@@ -226,7 +226,7 @@ export default function Home() {
           <button
             type="button"
             className="btn btn-glass tap !min-h-12 !rounded-full !text-[15px] !font-medium"
-            aria-label={`Narrator: ${tone === "desi" ? "Desi Drama" : "Noir"}. Tap to switch.`}
+            aria-label={`Narrator: ${tone === "desi" ? "Drama" : "Noir"}. Tap to switch.`}
             onClick={() => {
               sfx.tap();
               setTone(tone === "desi" ? "noir" : "desi");
@@ -235,7 +235,7 @@ export default function Home() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M4 9.5v5h3.5L12 18V6L7.500 9.500zM15.500 9a4 4 0 0 1 0 6M18 6.500a7.500 7.500 0 0 1 0 11" />
             </svg>
-            {tone === "desi" ? "Desi Drama" : "Noir"}
+            {tone === "desi" ? "Drama" : "Noir"}
           </button>
         </div>
       </div>
@@ -271,7 +271,7 @@ export default function Home() {
               <span className="eyebrow">Narrator</span>
               <div className="grid grid-cols-2 gap-1.5">
                 <button type="button" className="chip tap" aria-pressed={tone === "desi"} onClick={() => setTone("desi")}>
-                  Desi Drama
+                  Drama
                 </button>
                 <button type="button" className="chip tap" aria-pressed={tone === "noir"} onClick={() => setTone("noir")}>
                   Noir

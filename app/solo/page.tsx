@@ -289,7 +289,7 @@ export default function Solo() {
       // Fall back to the phone's own voice.
       if (!window.speechSynthesis) return setVoice("idle");
       const u = new SpeechSynthesisUtterance(text);
-      u.lang = "hi-IN";
+      u.lang = "en-IN";
       u.rate = 0.95;
       u.onend = () => setVoice("idle");
       window.speechSynthesis.speak(u);

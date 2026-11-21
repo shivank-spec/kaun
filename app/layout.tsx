@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { Suspense } from "react";
+import { DesktopFrame } from "@/components/ui/DesktopFrame";
 import "./globals.css";
 
 const inter = Inter({ variable: "--f-inter", subsets: ["latin"] });
@@ -30,6 +32,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${inter.variable} ${grotesk.variable} ${mono.variable}`}>
       <body>
         <div className="backdrop" aria-hidden="true" />
+        <Suspense fallback={null}>
+          <DesktopFrame />
+        </Suspense>
         <div className="shell">{children}</div>
       </body>
     </html>

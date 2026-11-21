@@ -37,7 +37,7 @@ async function groqVoice(text: string): Promise<Buffer> {
 async function geminiVoice(text: string, noir: boolean): Promise<Buffer> {
   const style = noir
     ? "Read this like a dry, world-weary noir detective narrator"
-    : "Read this like an over-the-top Indian TV crime show narrator, dramatic pauses, in a natural Indian accent";
+    : "Read this in English like an over-the-top TV crime show narrator, with dramatic pauses, in a natural Indian English accent";
   const res = await fetch(
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent",
     {

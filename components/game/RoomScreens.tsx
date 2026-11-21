@@ -196,7 +196,7 @@ export function Lobby({ room, actions }: Props) {
               </button>
             ))}
             <button type="button" className="chip tap !px-1 !text-[13px]" aria-pressed={tone === "noir"} onClick={() => setTone(tone === "desi" ? "noir" : "desi")}>
-              {tone === "desi" ? "Desi Drama" : "Noir"}
+              {tone === "desi" ? "Drama" : "Noir"}
             </button>
           </div>
           <input
@@ -634,7 +634,7 @@ export function Verdict({ room, actions }: Props) {
     }
     if (!window.speechSynthesis) return;
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = "hi-IN";
+    u.lang = "en-IN";
     u.rate = 0.95;
     u.onend = () => setVoice("idle");
     window.speechSynthesis.speak(u);
