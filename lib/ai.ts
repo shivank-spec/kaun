@@ -10,10 +10,13 @@ const groq = () =>
     maxRetries: 0,
   });
 
+export const groqClient = groq;
+
 export const openai = () =>
   new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 0 });
 
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+const GROQ_MODEL = "openai/gpt-oss-120b";
+const GROQ_BACKUP_MODEL = "openai/gpt-oss-20b";
 const OPENAI_MODEL = "gpt-4o-mini";
 
 interface JsonCall {
@@ -31,9 +34,12 @@ async function callJSON(
   c: JsonCall,
   timeout: number,
 ): Promise<unknown> {
+  const isGroq = model.startsWith("openai/");
   const res = await client.chat.completions.create(
     {
       model,
+      // gpt-oss models think before answering; keep that short so we stay fast.
+      ...(isGroq ? ({ reasoning_effort: "low" } as object) : {}),
       temperature: c.temperature ?? 0.9,
       max_tokens: c.maxTokens ?? 1800,
       response_format: { type: "json_object" },
@@ -54,7 +60,12 @@ export async function chatJSON(c: JsonCall): Promise<unknown> {
     try {
       return await callJSON(groq(), GROQ_MODEL, c, c.groqTimeoutMs ?? 8000);
     } catch (e) {
-      console.warn("[ai] groq failed, falling back to openai:", (e as Error).message);
+      console.warn("[ai] groq primary failed:", (e as Error).message);
+      try {
+        return await callJSON(groq(), GROQ_BACKUP_MODEL, c, c.groqTimeoutMs ?? 8000);
+      } catch (e2) {
+        console.warn("[ai] groq backup failed:", (e2 as Error).message);
+      }
     }
   }
   return callJSON(openai(), OPENAI_MODEL, c, c.openaiTimeoutMs ?? 14000);

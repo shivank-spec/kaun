@@ -1,69 +1,187 @@
-import Image from "next/image";
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import type { Tone } from "@/lib/types";
+
+const SETTINGS = ["Kolkata", "This hackathon room"] as const;
 
 export default function Home() {
+  const router = useRouter();
+  const [setting, setSetting] = useState<string>("Kolkata");
+  const [custom, setCustom] = useState("");
+  const [tone, setTone] = useState<Tone>("desi");
+  const [mode, setMode] = useState<"menu" | "host" | "join">("menu");
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [demo, setDemo] = useState(false);
+
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    setDemo(q.get("demo") === "true");
+    setName(localStorage.getItem("kaun.name") || "");
+    // Reconnect: if a game is in progress, offer to jump back in.
+    const join = q.get("join");
+    if (join) {
+      setCode(join.toUpperCase().slice(0, 4));
+      setMode("join");
+    }
+  }, []);
+
+  const chosenSetting = custom.trim() || setting;
+  const soloHref = `/solo?setting=${encodeURIComponent(chosenSetting)}&tone=${tone}`;
+
+  async function host() {
+    if (!name.trim()) return setError("Enter your name");
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch("/api/room", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, setting: chosenSetting, tone, demo }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      localStorage.setItem("kaun.name", name.trim());
+      localStorage.setItem(
+        "kaun.session",
+        JSON.stringify({ code: data.code, playerId: data.playerId, name: name.trim() }),
+      );
+      router.push(`/room/${data.code}`);
+    } catch (e) {
+      setError((e as Error).message || "Could not create a room");
+      setBusy(false);
+    }
+  }
+
+  function join() {
+    if (code.length !== 4) return setError("Enter the 4-letter code");
+    router.push(`/room/${code}`);
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+    <main className="relative z-10 flex min-h-dvh flex-col px-6 pb-8 pt-14">
+      <div className="rise">
+        <p className="font-type text-xs tracking-[0.3em] text-taxi">CASE FILE · KOLKATA</p>
+        <h1 className="mt-3 font-serif text-[5.5rem] leading-[0.85]">Kaun?</h1>
+        <p className="mt-4 max-w-[17rem] text-lg leading-snug text-paper/80">
+          A new mystery every 3 minutes. One of them is lying.
+        </p>
+      </div>
+
+      <div className="mt-auto space-y-3 pt-10">
+        {mode === "menu" && (
+          <>
+            <div className="mb-4 space-y-3 rise">
+              <div>
+                <p className="mb-2 font-type text-[0.7rem] tracking-[0.2em] text-muted">WHERE</p>
+                <div className="flex gap-2">
+                  {SETTINGS.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => {
+                        setSetting(s);
+                        setCustom("");
+                      }}
+                      className={`min-h-11 flex-1 rounded-full border px-3 text-sm ${
+                        !custom.trim() && setting === s
+                          ? "border-taxi bg-taxi/15 text-taxi"
+                          : "border-paper/20 text-paper/70"
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  value={custom}
+                  onChange={(e) => setCustom(e.target.value.slice(0, 30))}
+                  placeholder="or type your own: our college canteen"
+                  className="mt-2 min-h-11 w-full rounded-full border border-paper/20 bg-transparent px-4 text-sm outline-none placeholder:text-paper/35 focus:border-taxi"
+                />
+              </div>
+              <div>
+                <p className="mb-2 font-type text-[0.7rem] tracking-[0.2em] text-muted">NARRATOR</p>
+                <div className="flex gap-2">
+                  {(
+                    [
+                      ["desi", "Desi Drama"],
+                      ["noir", "Noir"],
+                    ] as const
+                  ).map(([t, label]) => (
+                    <button
+                      key={t}
+                      onClick={() => setTone(t)}
+                      className={`min-h-11 flex-1 rounded-full border px-3 text-sm ${
+                        tone === t ? "border-taxi bg-taxi/15 text-taxi" : "border-paper/20 text-paper/70"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <button className="btn btn-primary" onClick={() => router.push(soloHref)}>
+              Play solo
+            </button>
+            <button className="btn btn-ghost" onClick={() => setMode("host")}>
+              Play with friends
+            </button>
+            <button className="btn btn-ghost" onClick={() => setMode("join")}>
+              Join with code
+            </button>
+          </>
+        )}
+
+        {mode === "host" && (
+          <div className="space-y-3 rise">
+            <p className="font-serif text-3xl">Your name, detective?</p>
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value.slice(0, 16))}
+              onKeyDown={(e) => e.key === "Enter" && host()}
+              placeholder="Name"
+              className="min-h-14 w-full rounded-xl border border-paper/25 bg-transparent px-4 text-lg outline-none focus:border-taxi"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            <button className="btn btn-primary" disabled={busy} onClick={host}>
+              {busy ? "Opening room…" : "Create room"}
+            </button>
+            <button className="btn btn-ghost" onClick={() => setMode("menu")}>
+              Back
+            </button>
+          </div>
+        )}
+
+        {mode === "join" && (
+          <div className="space-y-3 rise">
+            <p className="font-serif text-3xl">Enter the room code</p>
+            <input
+              autoFocus
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/[^a-zA-Z]/g, "").toUpperCase().slice(0, 4))}
+              onKeyDown={(e) => e.key === "Enter" && join()}
+              placeholder="ABCD"
+              className="min-h-16 w-full rounded-xl border border-paper/25 bg-transparent text-center font-type text-4xl tracking-[0.4em] outline-none focus:border-taxi"
+            />
+            <button className="btn btn-primary" onClick={join}>
+              Join
+            </button>
+            <button className="btn btn-ghost" onClick={() => setMode("menu")}>
+              Back
+            </button>
+          </div>
+        )}
+
+        {error && <p className="text-center text-sm text-culprit">{error}</p>}
+        <p className="pt-2 text-center font-type text-[0.65rem] tracking-[0.15em] text-muted">
+          NO SIGN-UP · 3 MINUTES · PLAY AGAIN FOREVER
+        </p>
+      </div>
+    </main>
   );
 }

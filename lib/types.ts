@@ -14,6 +14,7 @@ export interface Suspect {
   speaking_style: string; // how they talk
   public_alibi: string; // what they claim
   innocent_secret: string; // embarrassing but innocent thing they hide
+  private_clues?: string[]; // multiplayer only: the 2 clues on this player's card
 }
 
 export interface Clue {
@@ -28,6 +29,7 @@ export interface CaseFile {
   title: string;
   setting: string;
   crime: string; // 1-2 lines, what happened
+  crime_verb: string; // finishes "Find who ...", e.g. "stole the last rosogolla"
   intro: string; // narrator opening, 2-3 lines
   suspects: Suspect[]; // exactly 4 in solo, one per player in multiplayer
   culprit_id: string;
@@ -58,7 +60,7 @@ export interface SoloCaseView {
   crime: string;
   intro: string;
   suspects: PublicSuspect[];
-  totalClues: number; // always 3 (true clues)
+  totalClues: number; // 5 (3 true + 2 red herrings; the player must judge which matter)
   durationSec: number; // 150
 }
 

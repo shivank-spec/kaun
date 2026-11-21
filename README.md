@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kaun?
 
-## Getting Started
+A 3-minute AI mystery party game set in Kolkata where friends interrogate suspects, argue over petty crimes, and get roasted by a dramatic CID-style narrator.
 
-First, run the development server:
+Built for the **Play** track at **Vibe Coders Hackathon Edition 3** (Calcutta AI Club, AIC Techno).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Play it
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Live at: https://playkaun.vercel.app
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## How a round works
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**Solo mode:**
+1. Tap Play solo and the AI writes a brand-new Kolkata case (a missing rosogolla at KC Das, an unplugged router at AIC Techno).
+2. Interrogate 4 AI suspects in 2.5 minutes. Three are innocent but hiding something embarrassing, and one is actively lying.
+3. Lock in your accusation before the clock hits zero and hear the dramatic reveal.
 
-## Learn More
+**With friends (party mode):**
+1. Create a room and share the 4-letter code; friends join on their phones with just a name.
+2. Everyone gets a secret role card: one player is the culprit with a mandatory lie to push, and the rest hold partial clues and red herrings.
+3. Argue, defend, and accuse out loud before the timer runs out.
+4. Vote on your phone for who did it, listen to the voiced narrator reveal, and share the front-page newspaper receipt.
 
-To learn more about Next.js, take a look at the following resources:
+## How it meets the 3 Play rules
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **No sign-up to play:** Zero accounts, passwords, or email prompts. Players enter a name and a 4-letter room code and are inside the lobby in under 20 seconds.
+- **Understood in 30 seconds:** Every phone screen opens with a high-contrast role banner ("YOU ARE INNOCENT" or "YOU ARE THE CULPRIT") and a single-sentence objective with two short clues. No rulebook or verbal explanation required.
+- **One round under 3 minutes:** A strict server-synced countdown (20 seconds to read your card, 100 seconds of discussion, 30 seconds of voting) keeps a full round at 2.5 minutes, with one-tap replay.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## What the AI actually does
 
-## Deploy on Vercel
+- **Constructs a solvable logic puzzle:** Instead of improvising loose stories, the model returns structured JSON by picking the culprit first, then building 3 interlocking true clues (each held by a different innocent), 2 red herrings tied to harmless personal secrets, a specific hole in the culprit's alibi, and a secret lie the culprit must convince the room of. Every case is then checked by code (`validateCase`) before it is allowed into a game.
+- **Roleplays 4 consistent suspects:** In solo interrogations, each suspect responds in their own voice (Hinglish, dramatic, nervous, or posh) while defending their alibi or hiding their innocent secret, and only gives up a clue when the question earns it.
+- **Delivers dynamic voiced endings:** Depending on whether the group catches the culprit or frames an innocent friend, the narrator switches between two CID-style Hinglish endings and roasts the culprit on a shareable newspaper front page.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## How it is built
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Frontend and API:** Next.js (App Router), TypeScript, and Tailwind CSS deployed on Vercel, with an HTML5 Canvas generator for shareable 1080x1920 front-page cards.
+- **Multiplayer sync and state:** Supabase Postgres with a server-owned game clock (`phase_ends_at` timestamps) so every phone stays synchronised across phases and survives browser refreshes via `localStorage` session recovery.
+- **Strict secret isolation:** In multiplayer, culprit identity and private clues are filtered on the server and never sent to a client until the reveal. In solo, the whole case is AES-encrypted into the case token, so the browser carries it but cannot read it.
+- **Zero-stall fallback:** If the AI is slow or returns an illogical case, the server falls back to hand-written, logically airtight Kolkata cases so a round never stalls.
+- **Models:** Groq-hosted `gpt-oss-120b` for case writing and suspect roleplay (about 3 seconds per case), Groq Orpheus for the narrator's voice.
+
+Built in one day by a team of 2 using Claude Code, Claude Design and Gemini.
+
+## Demo video
+
+_Link added at submission._
