@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { sfx, unlockSfx } from "@/components/ui/kit";
-import type { LeaderboardView, Tone } from "@/lib/types";
+import type { Difficulty, LeaderboardView, Tone } from "@/lib/types";
 
 type SettingId = "kolkata" | "room" | "custom";
 const SETTINGS: { id: SettingId; label: string; value: string }[] = [
@@ -17,6 +17,7 @@ export default function Home() {
   const [settingId, setSettingId] = useState<SettingId>("kolkata");
   const [custom, setCustom] = useState("");
   const [tone, setTone] = useState<Tone>("desi");
+  const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [code, setCode] = useState(["", "", "", ""]);
   const [sheet, setSheet] = useState<null | "settings" | "name">(null);
   const [name, setName] = useState("");
@@ -38,6 +39,7 @@ export default function Home() {
         if (p.settingId) setSettingId(p.settingId);
         if (p.custom) setCustom(p.custom);
         if (p.tone) setTone(p.tone);
+        if (p.difficulty) setDifficulty(p.difficulty);
       } catch {}
     }
     // If this phone was in a game that is still running, offer a way back in.
@@ -57,8 +59,8 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("kaun.prefs", JSON.stringify({ settingId, custom, tone }));
-  }, [settingId, custom, tone]);
+    localStorage.setItem("kaun.prefs", JSON.stringify({ settingId, custom, tone, difficulty }));
+  }, [settingId, custom, tone, difficulty]);
 
   const setting =
     settingId === "custom" ? custom.trim() || "Kolkata" : SETTINGS.find((s) => s.id === settingId)!.value;
@@ -91,7 +93,7 @@ export default function Home() {
       const res = await fetch("/api/room", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, setting, tone, demo }),
+        body: JSON.stringify({ name, setting, tone, demo, difficulty }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -170,7 +172,7 @@ export default function Home() {
           className="btn btn-glass tap justify-between px-5"
           onClick={() => {
             sfx.tap();
-            router.push(`/solo?setting=${encodeURIComponent(setting)}&tone=${tone}`);
+            router.push(`/solo?setting=${encodeURIComponent(setting)}&tone=${tone}&difficulty=${difficulty}`);
           }}
         >
           <span className="flex items-center gap-2.5">
@@ -179,7 +181,7 @@ export default function Home() {
             </svg>
             Play Solo
           </span>
-          <span className="mono text-[14px] font-medium text-mist">02:30</span>
+          <span className="mono text-[14px] font-medium text-mist">{{ easy: "02:50", medium: "02:30", hard: "02:00" }[difficulty]}</span>
         </button>
 
         <div role="group" aria-label="Room code" className="mt-1 flex justify-center gap-3">
@@ -217,6 +219,23 @@ export default function Home() {
         <p role="status" className="label m-0 h-[14px] text-center text-snow">
           {status}
         </p>
+
+        <div role="group" aria-label="Difficulty" className="grid grid-cols-3 gap-1.5">
+          {(["easy", "medium", "hard"] as const).map((d) => (
+            <button
+              key={d}
+              type="button"
+              className="chip tap !min-h-11 capitalize"
+              aria-pressed={difficulty === d}
+              onClick={() => {
+                sfx.tap();
+                setDifficulty(d);
+              }}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <button type="button" className="btn btn-glass tap !min-h-12 !rounded-full !text-[15px] !font-medium" onClick={() => setSheet("settings")}>

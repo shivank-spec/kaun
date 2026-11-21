@@ -103,6 +103,7 @@ export default function Solo() {
       const v = await post<SoloCaseView>("/api/case", {
         setting: q.get("setting") || "Kolkata",
         tone: q.get("tone") || "desi",
+        difficulty: q.get("difficulty") || "medium",
         seen,
       });
       localStorage.setItem("kaun.seen", JSON.stringify([...seen, v.title].slice(-60)));
@@ -357,7 +358,7 @@ export default function Solo() {
         </div>
 
         <p className="label mb-3 mt-4 text-center">
-          {view.actions} moves · {Math.floor(view.durationSec / 60)}:{String(view.durationSec % 60).padStart(2, "0")} on the clock
+          {view.difficulty} · {view.actions} moves · {Math.floor(view.durationSec / 60)}:{String(view.durationSec % 60).padStart(2, "0")} on the clock
         </p>
         <button
           type="button"
@@ -367,7 +368,7 @@ export default function Solo() {
             sfx.tap();
             startedAt.current = Date.now();
             setStage("play");
-            flash("How to play", "Tap a glowing spot to search it. Tap a suspect to question them. You have 6 moves.");
+            flash("How to play", `Tap a glowing spot to search it. Tap a suspect to question them. You have ${view.actions} moves.`);
           }}
         >
           Begin Investigation

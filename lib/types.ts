@@ -2,6 +2,7 @@
 // Do not change these shapes without telling the whole team.
 
 export type Tone = "desi" | "noir";
+export type Difficulty = "easy" | "medium" | "hard";
 export type Role = "innocent" | "culprit";
 
 /* ---------- The full case (SERVER ONLY, never sent to a browser) ---------- */
@@ -74,7 +75,8 @@ export interface SoloCaseView {
   suspects: PublicSuspect[];
   totalClues: number; // 5 (3 true + 2 red herrings; the player must judge which matter)
   durationSec: number; // 150
-  actions: number; // 6: ask costs 1, press costs 2, confront costs 1
+  actions: number; // moves allowed: ask costs 1, press costs 2, confront costs 1
+  difficulty: Difficulty;
   spots: MapSpot[];
 }
 
@@ -125,6 +127,7 @@ export interface RoomSettings {
   setting: string; // "Kolkata" | "This hackathon room" | custom 3 words
   tone: Tone;
   demo: boolean; // ?demo=true speedrun
+  difficulty?: Difficulty;
 }
 
 export interface PlayerCard {
@@ -151,6 +154,7 @@ export interface RoomView {
   code: string;
   status: RoomStatus;
   phaseEndsAt: string | null; // ISO UTC. Countdown = phaseEndsAt - serverNow
+  phaseTotalSec?: number; // full length of the current phase, for progress bars
   serverNow: string; // ISO UTC, use to correct clock drift
   settings: RoomSettings;
   players: {

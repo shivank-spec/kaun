@@ -142,7 +142,7 @@ const COMMON_RULES = `
 RULES
 - REALISM: this must read like a real case file, not a joke. Choose a serious, high-stakes, non-violent crime: a jewel or art theft, a swapped forgery, a leaked exam paper or tender bid, stolen source code or client data, a wiped server, embezzlement, a sabotaged machine or race, a doctored document, blackmail, an inside job. Never a stolen snack or sweet. Nobody is hurt or killed.
 - Give it real-world texture: exact clock times, a rupee value or what is at stake, named rooms, and forensic-style evidence (CCTV timestamps, access-card logs, phone records, fingerprints, transaction IDs, a torn receipt, tyre marks, metadata).
-- Suspects are believable adults with real jobs and real motives (debt, a passed-over promotion, a rival's offer, a cover-up). Titles are short and sound like a case file, e.g. "The Camac Street Switch".
+- Suspects are believable adults with real jobs and real motives (debt, a passed-over promotion, a rival's offer, a cover-up). Titles are short and sound like a case file. Vary them: do not always use the word "Heist" (e.g. "The Camac Street Switch", "Lot 47", "Night Shift at Gate 3").
 - Decide the culprit, motive, method and timeline FIRST. Then write everything else to be consistent with them.
 - "crime_verb" finishes the sentence "Find who ..." in under 8 words, e.g. "swapped the necklace for a fake".
 - "alibi_hole" is the one concrete, checkable fact that breaks the culprit's public_alibi.
@@ -152,9 +152,35 @@ RULES
 - "ending_caught" (3-4 sentences) narrates how the culprit did it and how the evidence caught them. "ending_escaped" (3-4 sentences) narrates how the culprit got away with it. Both name the culprit and explain the method.
 - "roast" is one dry, cutting line about the culprit, the kind a detective says while closing the file.
 - LANGUAGE: write everything in plain English only. No Hindi, Bengali or Hinglish words anywhere (names of people and places are fine).
-- Keep every string tight. No markdown. Output ONLY the JSON object.`;
+- Keep every string tight: under 30 words each. No markdown. Output ONLY the complete JSON object with every key present.`;
 
-function soloPrompt(setting: string, tone: Tone) {
+// Models repeat themselves: the same first names, the same guilty slot. So the
+// server deals the names and picks the culprit, and the model writes around them.
+const FIRST_NAMES = [
+  "Ananya", "Arjun", "Meera", "Kabir", "Ishita", "Vikram", "Tara", "Nikhil", "Riya", "Dev",
+  "Sanjana", "Aditya", "Pooja", "Rahul", "Nandini", "Karan", "Diya", "Siddharth", "Leela", "Farhan",
+  "Zoya", "Imran", "Kavya", "Rohan", "Shreya", "Yash", "Mira", "Abhay", "Trisha", "Varun",
+  "Aisha", "Neil", "Priyanka", "Gaurav", "Sana", "Manav", "Anjali", "Dhruv", "Lara", "Samar",
+];
+const LAST_NAMES = [
+  "Sen", "Bose", "Mukherjee", "Roy", "Ghosh", "Dutta", "Chatterjee", "Banerjee", "Mitra", "Sarkar",
+  "Kapoor", "Mehta", "Agarwal", "Khan", "D'Souza", "Iyer", "Sinha", "Jalan", "Fernandes", "Rao",
+];
+function shuffled<T>(list: T[]): T[] {
+  const a = [...list];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function dealNames(n: number): string[] {
+  const firsts = shuffled(FIRST_NAMES).slice(0, n);
+  const lasts = shuffled(LAST_NAMES).slice(0, n);
+  return firsts.map((f, i) => `${f} ${lasts[i]}`);
+}
+
+function soloPrompt(setting: string, tone: Tone, culprit: string, names: string[]) {
   return {
     system: `You are a crime writer designing airtight, realistic case files for a 3-minute detective game. ${toneGuide(tone)}
 Return ONE JSON object with exactly these keys:
@@ -169,7 +195,8 @@ ${COMMON_RULES}
 - Each TRUE clue: points_to = culprit_id, and held_by = a DIFFERENT innocent suspect (it is something that suspect saw or knows). The three together prove the culprit.
 - Each RED HERRING: points_to an innocent suspect, held_by a different suspect, and is fully explained by the accused suspect's innocent_secret.
 - The culprit's innocent_secret field holds the cover story they use.
-- Pick the culprit at random among s1..s4. Do not always pick the same position.`,
+- The suspects MUST be named exactly: ${names.map((n, i) => `s${i + 1} = ${n}`).join(", ")}.
+- The culprit MUST be ${culprit}. Do not choose anyone else.`,
     user: `Setting: ${setting}. Random seed: ${Math.random().toString(36).slice(2, 8)}. Write the case.`,
   };
 }
@@ -182,7 +209,7 @@ function roomPrompt(
 ) {
   const list = players.map((p) => `${p.id} = ${p.name}`).join(", ");
   const culpritRule = culpritAmong
-    ? `The culprit MUST be one of these ids, chosen at random: ${culpritAmong.join(", ")}.`
+    ? `The culprit MUST be ${culpritAmong[Math.floor(Math.random() * culpritAmong.length)]}. Do not choose anyone else.`
     : "Pick the culprit at random from the players.";
   return {
     system: `You are a crime writer designing airtight, realistic case files for a party game where REAL FRIENDS are the suspects and argue out loud for 2 minutes. ${toneGuide(tone)}
@@ -319,7 +346,13 @@ export async function generateCase(
 ): Promise<{ file: CaseFile; source: "ai" | "fallback" }> {
   const tone: Tone = opts.tone === "noir" ? "noir" : "desi";
   const setting = resolveSetting(opts.setting);
-  if (!opts.players) return attempt("solo", soloPrompt(setting, tone));
+  if (!opts.players) {
+    const culprit = `s${1 + Math.floor(Math.random() * 4)}`;
+    const result = await attempt("solo", soloPrompt(setting, tone, culprit, dealNames(4)));
+    // Shuffle the line-up so the guilty one is not always in the same seat.
+    result.file.suspects = shuffled(result.file.suspects);
+    return result;
+  }
 
   // Real player ids are long UUIDs, which language models copy unreliably.
   // Give the model short ids (p1, p2, ...) and translate back afterwards.
@@ -329,7 +362,8 @@ export async function generateCase(
   const shortAmong = opts.culpritAmong?.map((id) => toShort.get(id)!).filter(Boolean);
   const players = short.map(({ id, name }) => ({ id, name }));
 
-  const result = await attempt("room", roomPrompt(setting, tone, players, shortAmong), players, shortAmong);
+  const everyone = shortAmong ?? players.map((p) => p.id);
+  const result = await attempt("room", roomPrompt(setting, tone, players, everyone), players, shortAmong);
   const f = result.file;
   const real = (id: string) => toReal.get(id) ?? id;
   f.suspects = f.suspects.map((s) => ({ ...s, id: real(s.id) }));
@@ -338,7 +372,7 @@ export async function generateCase(
   return result;
 }
 
-const CASE_BUDGET_MS = 13000; // a party cannot stare at a spinner for longer
+const CASE_BUDGET_MS = 16000; // a party cannot stare at a spinner for longer
 
 async function attempt(
   mode: "solo" | "room",
@@ -352,7 +386,7 @@ async function attempt(
     if (left < 2500) break;
     try {
       const raw = await Promise.race([
-        chatJSON({ ...prompt, temperature: 0.95, maxTokens: 3500, groqTimeoutMs: Math.min(9000, left) }),
+        chatJSON({ ...prompt, temperature: 0.95, maxTokens: 4000, groqTimeoutMs: Math.min(9000, left) }),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error("case budget exceeded")), left)),
       ]);
       return { file: parse(raw, mode, players, culpritAmong), source: "ai" };

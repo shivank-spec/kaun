@@ -1,6 +1,7 @@
 import { chatJSON } from "./ai";
 import type {
   AskMode,
+  Difficulty,
   CaseFile,
   ChatMessage,
   InterrogateResponse,
@@ -11,13 +12,20 @@ import type {
 } from "./types";
 import { seal, unseal } from "./seal";
 
-export const SOLO_SECONDS = 150;
-export const SOLO_ACTIONS = 6;
+/** Easy gives you room to explore; Hard gives you four moves and two minutes. */
+export const LEVELS: Record<Difficulty, { actions: number; seconds: number; bonus: number }> = {
+  easy: { actions: 8, seconds: 170, bonus: 0.8 },
+  medium: { actions: 6, seconds: 150, bonus: 1 },
+  hard: { actions: 4, seconds: 120, bonus: 1.4 },
+};
+export const asDifficulty = (v: unknown): Difficulty =>
+  v === "easy" || v === "hard" ? v : "medium";
 export const ACTION_COST: Record<AskMode, number> = { ask: 1, press: 2, confront: 1 };
 
 interface Sealed {
   file: CaseFile;
   tone: Tone;
+  difficulty?: Difficulty;
 }
 
 /**
@@ -39,9 +47,10 @@ function spotsOf(file: CaseFile): MapSpot[] {
   ];
 }
 
-export function toSoloView(file: CaseFile, tone: Tone): SoloCaseView {
+export function toSoloView(file: CaseFile, tone: Tone, difficulty: Difficulty = "medium"): SoloCaseView {
+  const level = LEVELS[difficulty];
   return {
-    caseId: seal({ file, tone } satisfies Sealed),
+    caseId: seal({ file, tone, difficulty } satisfies Sealed),
     title: file.title,
     setting: file.setting,
     crime: file.crime,
@@ -54,8 +63,9 @@ export function toSoloView(file: CaseFile, tone: Tone): SoloCaseView {
       room: i % 4,
     })),
     totalClues: file.clues.length,
-    durationSec: SOLO_SECONDS,
-    actions: SOLO_ACTIONS,
+    durationSec: level.seconds,
+    actions: level.actions,
+    difficulty,
     spots: spotsOf(file),
   };
 }
@@ -219,15 +229,16 @@ export function accuse(
   secondsUsed: number,
   confrontedClueIds: string[] = [],
 ): SoloVerdict {
-  const { file } = openCase(caseId);
+  const { file, difficulty } = openCase(caseId);
+  const level = LEVELS[difficulty ?? "medium"];
   const culprit = file.suspects.find((s) => s.id === file.culprit_id)!;
   const correct = suspectId === file.culprit_id;
   const isTrue = (id: string) => file.clues.some((k) => k.id === id && !k.is_red_herring);
   const trueFound = [...new Set(foundClueIds)].filter(isTrue).length;
   const contradictions = Math.min(2, [...new Set(confrontedClueIds)].filter(isTrue).length);
-  const left = Math.max(0, SOLO_SECONDS - Math.max(0, secondsUsed));
+  const left = Math.max(0, level.seconds - Math.max(0, secondsUsed));
   const score = correct
-    ? 400 + trueFound * 60 + contradictions * 90 + Math.round((left / SOLO_SECONDS) * 200)
+    ? Math.round((400 + trueFound * 60 + contradictions * 90 + (left / level.seconds) * 200) * level.bonus)
     : trueFound * 30;
   return {
     correct,

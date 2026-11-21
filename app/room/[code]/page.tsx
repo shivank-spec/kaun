@@ -40,7 +40,7 @@ function Room({ code }: { code: string }) {
       refresh();
     };
     return {
-      start: (setting, tone) => run("start", { setting, tone }),
+      start: (setting, tone, difficulty) => run("start", { setting, tone, difficulty }),
       vote: (targetId) => run("vote", { targetId }),
       again: () => run("again", {}),
       doubt: (targetId) => run("doubt", { targetId }),

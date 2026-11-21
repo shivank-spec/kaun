@@ -28,6 +28,12 @@ const SECONDS = {
   normal: { briefing: 20, discuss: 100, vote: 30 },
   demo: { briefing: 10, discuss: 45, vote: 20 },
 };
+// Harder rooms get less time to argue. Every level still fits in three minutes.
+const DISCUSS_BY_LEVEL = { easy: 120, medium: 100, hard: 70 } as const;
+function timings(settings: RoomSettings) {
+  if (settings.demo) return SECONDS.demo;
+  return { ...SECONDS.normal, discuss: DISCUSS_BY_LEVEL[settings.difficulty ?? "medium"] };
+}
 const MIN_HUMANS = 2; // with 2 humans an AI bot fills the third seat
 const MIN_SEATS = 3;
 const BOT_NAMES = ["Inspector Bot", "Havaldar Bot"];
@@ -45,7 +51,11 @@ function cleanSettings(raw: Partial<RoomSettings> | undefined, base?: RoomSettin
     typeof raw?.setting === "string" && raw.setting.trim()
       ? raw.setting.trim().slice(0, 40)
       : (base?.setting ?? "Kolkata");
-  return { tone, setting, demo: raw?.demo ?? base?.demo ?? false };
+  const difficulty =
+    raw?.difficulty === "easy" || raw?.difficulty === "hard" || raw?.difficulty === "medium"
+      ? raw.difficulty
+      : (base?.difficulty ?? "medium");
+  return { tone, setting, demo: raw?.demo ?? base?.demo ?? false, difficulty };
 }
 
 /* ---------------- create / join ---------------- */
@@ -172,7 +182,7 @@ export async function startRoom(
     await Promise.all(
       players.map((p) => db.updatePlayer(p.id, { card: buildCard(file, p.id), vote: null, doubt: null })),
     );
-    const t = merged.demo ? SECONDS.demo : SECONDS.normal;
+    const t = timings(merged);
     await db.updateRoomIf(code, "generating", {
       status: "briefing",
       case_file: file,
@@ -299,7 +309,7 @@ export async function playAgain(codeRaw: string, playerId: string) {
 /** Move the room forward if its phase has run out. Safe to call from every poll. */
 async function advance(room: RoomRow, players: PlayerRow[]): Promise<RoomRow> {
   const db = store();
-  const t = room.settings.demo ? SECONDS.demo : SECONDS.normal;
+  const t = timings(room.settings);
   const expired = room.phase_ends_at ? Date.now() >= Date.parse(room.phase_ends_at) : false;
   let next: { expected: RoomStatus; patch: Partial<RoomRow> } | null = null;
 
@@ -342,7 +352,7 @@ const HOT_SEAT_SECONDS = 15;
 function hotSeatNow(room: RoomRow, players: PlayerRow[]) {
   const hs = room.case_file?.hot_seat;
   if (room.status !== "discuss" || !hs || !room.phase_ends_at) return null;
-  const total = (room.settings.demo ? SECONDS.demo : SECONDS.normal).discuss * 1000;
+  const total = timings(room.settings).discuss * 1000;
   const start = Date.parse(room.phase_ends_at) - total / 2;
   const end = start + HOT_SEAT_SECONDS * 1000;
   const target = players.find((p) => p.id === hs.player_id && !p.is_bot);
@@ -378,6 +388,10 @@ export async function getRoomView(codeRaw: string, playerId: string | null): Pro
     status: room.status,
     phaseEndsAt: room.phase_ends_at,
     serverNow: new Date().toISOString(),
+    phaseTotalSec:
+      room.status === "briefing" || room.status === "discuss" || room.status === "vote"
+        ? timings(room.settings)[room.status]
+        : undefined,
     settings: room.settings,
     players: players.map((p) => ({
       id: p.id,

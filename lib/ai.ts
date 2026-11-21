@@ -91,10 +91,10 @@ function providers(kind: "case" | "chat"): Provider[] {
   const list: (Provider | false)[] =
     kind === "case"
       ? [
+          // Gemini Flash has by far the most free headroom, so it writes cases first.
+          m && viaGemini(GEMINI_FLASH, 11000),
           g && viaGroq(BIG),
-          m && viaGemini(GEMINI_FLASH, 7000),
-          g && viaGroq(ALT),
-          m && viaGemini(GEMINI_LITE, 6000),
+          m && viaGemini(GEMINI_LITE, 9000),
           g && viaGroq(SMALL),
         ]
       : [

@@ -5,13 +5,13 @@ import { useEffect, useRef, useState } from "react";
 import ShareCard from "@/components/ShareCard";
 import { Avatar, Meter, Timer, TopBar, XpCard, addXp, readXp, ringOf, sfx } from "@/components/ui/kit";
 import { post } from "@/components/room/api";
-import type { PlayerCard, RoomView, Tone } from "@/lib/types";
+import type { Difficulty, PlayerCard, RoomView, Tone } from "@/lib/types";
 
 /* The multiplayer screens. Each one renders purely from the RoomView the
    server sends; the server owns the clock and moves the phases. */
 
 export interface RoomActions {
-  start: (setting: string, tone: Tone) => Promise<void>;
+  start: (setting: string, tone: Tone, difficulty: Difficulty) => Promise<void>;
   vote: (targetId: string) => Promise<void>;
   again: () => Promise<void>;
   doubt: (targetId: string | null) => Promise<void>;
@@ -99,6 +99,7 @@ export function Lobby({ room, actions }: Props) {
   const [setting, setSetting] = useState(room.settings.setting);
   const [custom, setCustom] = useState(SETTINGS.includes(room.settings.setting) ? "" : room.settings.setting);
   const [tone, setTone] = useState<Tone>(room.settings.tone);
+  const [difficulty, setDifficulty] = useState<Difficulty>(room.settings.difficulty ?? "medium");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [qr, setQr] = useState(false);
@@ -129,7 +130,7 @@ export function Lobby({ room, actions }: Props) {
     setBusy(true);
     setError("");
     try {
-      await actions.start(custom.trim() || setting, tone);
+      await actions.start(custom.trim() || setting, tone, difficulty);
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
@@ -198,6 +199,13 @@ export function Lobby({ room, actions }: Props) {
             <button type="button" className="chip tap !px-1 !text-[13px]" aria-pressed={tone === "noir"} onClick={() => setTone(tone === "desi" ? "noir" : "desi")}>
               {tone === "desi" ? "Drama" : "Noir"}
             </button>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            {(["easy", "medium", "hard"] as const).map((d) => (
+              <button key={d} type="button" className="chip tap !px-1 !text-[13px] capitalize" aria-pressed={difficulty === d} onClick={() => setDifficulty(d)}>
+                {d}
+              </button>
+            ))}
           </div>
           <input
             className="field !min-h-11 !text-[14px]"
@@ -387,7 +395,7 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
   const [hidden, setHidden] = useState(false);
   const you = room.you;
   const card = you?.card;
-  const total = room.settings.demo ? 45 : 100;
+  const total = room.phaseTotalSec ?? (room.settings.demo ? 45 : 100);
   const hot = room.hotSeat ?? null;
   const hotLeft = hot ? Math.max(0, Math.ceil((Date.parse(hot.endsAt) - Date.parse(room.serverNow)) / 1000)) : 0;
   const lastHot = useRef<string | null>(null);
@@ -491,7 +499,7 @@ export function Vote({ room, actions, secondsLeft }: Props) {
   const [pick, setPick] = useState<string>(you?.votedFor ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const total = room.settings.demo ? 20 : 30;
+  const total = room.phaseTotalSec ?? (room.settings.demo ? 20 : 30);
   const votesIn = room.players.filter((p) => p.hasVoted).length;
 
   async function lock() {
