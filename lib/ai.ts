@@ -94,7 +94,7 @@ function providers(kind: "case" | "chat"): Provider[] {
           // Gemini Flash has by far the most free headroom, so it writes cases first.
           m && viaGemini(GEMINI_FLASH, 11000),
           g && viaGroq(BIG),
-          m && viaGemini(GEMINI_LITE, 9000),
+          m && viaGemini(GEMINI_LITE, 6000),
           g && viaGroq(SMALL),
         ]
       : [

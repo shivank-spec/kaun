@@ -286,10 +286,20 @@ function parse(
 
 /** Hand-written case re-cast onto the real players, so multiplayer never stalls. */
 function fallbackFor(players?: { id: string; name: string }[], culpritAmong?: string[]): CaseFile {
-  const base = structuredClone(
-    FALLBACK_CASES[Math.floor(Math.random() * FALLBACK_CASES.length)],
-  ) as CaseFile;
-  if (!players) return base;
+  const base = FALLBACK_CASES[Math.floor(Math.random() * FALLBACK_CASES.length)];
+  return players ? recastForPlayers(base, players, culpritAmong) : structuredClone(base);
+}
+
+/**
+ * Take any finished four-suspect case and re-cast it onto the real players in
+ * a room: one of them becomes the culprit and the clues are dealt out as cards.
+ */
+export function recastForPlayers(
+  source: CaseFile,
+  players: { id: string; name: string }[],
+  culpritAmong?: string[],
+): CaseFile {
+  const base = structuredClone(source) as CaseFile;
 
   const allowed = players
     .map((p, i) => ({ p, i }))
@@ -395,7 +405,7 @@ export async function generateCase(
   return result;
 }
 
-const CASE_BUDGET_MS = 16000; // a party cannot stare at a spinner for longer
+const CASE_BUDGET_MS = 12000; // a party cannot stare at a spinner for longer
 
 async function attempt(
   mode: "solo" | "room",

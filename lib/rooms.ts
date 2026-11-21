@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { chatJSON } from "./ai";
-import { generateCase } from "./generate-case";
+import { generateCase, recastForPlayers } from "./generate-case";
+import { drawCase } from "./pool";
 import { store, type PlayerRow, type RoomRow } from "./store";
 import { narrate } from "./voice";
 import type {
@@ -176,12 +177,21 @@ export async function startRoom(
       await db.addPlayer(bot);
       players.push(bot);
     }
-    const { file } = await generateCase({
+    const cast = players.map((p) => ({ id: p.id, name: p.name }));
+    const humanIds = humans.map((p) => p.id);
+    const made = await generateCase({
       setting: merged.setting,
       tone: merged.tone,
-      players: players.map((p) => ({ id: p.id, name: p.name })),
-      culpritAmong: humans.map((p) => p.id),
+      players: cast,
+      culpritAmong: humanIds,
     });
+    let file = made.file;
+    if (made.source === "fallback") {
+      // The AI was busy. A case from the bank, re-cast onto these players, is
+      // fresher than one of the four built-in ones.
+      const banked = await drawCase(/hackathon/i.test(merged.setting) ? "hackathon" : "kolkata", merged.tone, []).catch(() => null);
+      if (banked) file = recastForPlayers(banked.file, cast, humanIds);
+    }
     await Promise.all(
       players.map((p) => db.updatePlayer(p.id, { card: buildCard(file, p.id), vote: null, doubt: null })),
     );
