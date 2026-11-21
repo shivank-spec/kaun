@@ -246,6 +246,7 @@ export interface GenerateOptions {
   tone?: Tone;
   players?: { id: string; name: string }[]; // present = multiplayer
   culpritAmong?: string[]; // multiplayer: ids allowed to be the culprit (humans, not bots)
+  budgetMs?: number; // give up on the AI after this long and use a ready case
 }
 
 function parse(
@@ -395,7 +396,7 @@ export async function generateCase(
   const players = short.map(({ id, name }) => ({ id, name }));
 
   const everyone = shortAmong ?? players.map((p) => p.id);
-  const result = await attempt("room", roomPrompt(setting, tone, players, everyone), players, shortAmong);
+  const result = await attempt("room", roomPrompt(setting, tone, players, everyone), players, shortAmong, opts.budgetMs);
   const f = result.file;
   const real = (id: string) => toReal.get(id) ?? id;
   f.suspects = f.suspects.map((s) => ({ ...s, id: real(s.id) }));
@@ -411,10 +412,11 @@ async function attempt(
   prompt: { system: string; user: string },
   players?: { id: string; name: string }[],
   culpritAmong?: string[],
+  budgetMs = CASE_BUDGET_MS,
 ): Promise<{ file: CaseFile; source: "ai" | "fallback" }> {
   const started = Date.now();
   for (let n = 0; n < 2; n++) {
-    const left = CASE_BUDGET_MS - (Date.now() - started);
+    const left = budgetMs - (Date.now() - started);
     if (left < 2500) break;
     try {
       const raw = await Promise.race([

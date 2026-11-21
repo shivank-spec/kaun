@@ -195,6 +195,7 @@ export async function startRoom(
       tone: merged.tone,
       players: cast,
       culpritAmong: humanIds,
+      budgetMs: 7000, // a room full of people should not wait: after 7 s use a banked case
     });
     let file = made.file;
     if (made.source === "fallback") {
