@@ -92,9 +92,10 @@ Return ONLY JSON: {"reply": string, "reveal_clue_id": string | null}`;
   const raw = (await chatJSON({
     system,
     user: `${convo ? convo + "\n" : ""}DETECTIVE: ${message.slice(0, 300)}`,
+    kind: "chat",
     temperature: 0.9,
-    maxTokens: 700,
-    groqTimeoutMs: 7000,
+    maxTokens: 500,
+    groqTimeoutMs: 6000,
   })) as { reply?: unknown; reveal_clue_id?: unknown };
 
   const reply = typeof raw.reply === "string" && raw.reply.trim() ? raw.reply.trim() : "...";

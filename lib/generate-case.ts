@@ -200,7 +200,12 @@ function parse(
     if (players.some((p) => !byId.has(p.id))) throw new Error("missing player in case");
     c.suspects = players.map((p) => ({ ...byId.get(p.id)!, name: p.name }));
     if (culpritAmong && !culpritAmong.includes(c.culprit_id)) throw new Error("culprit is a bot");
-    if (c.hot_seat && (c.hot_seat.player_id === c.culprit_id || !byId.has(c.hot_seat.player_id))) {
+    if (
+      c.hot_seat &&
+      (c.hot_seat.player_id === c.culprit_id ||
+        !byId.has(c.hot_seat.player_id) ||
+        (culpritAmong && !culpritAmong.includes(c.hot_seat.player_id))) // never put a bot in the hot seat
+    ) {
       delete c.hot_seat;
     }
   }
@@ -269,18 +274,38 @@ export async function generateCase(
 ): Promise<{ file: CaseFile; source: "ai" | "fallback" }> {
   const tone: Tone = opts.tone === "noir" ? "noir" : "desi";
   const setting = resolveSetting(opts.setting);
-  const mode = opts.players ? "room" : "solo";
-  const prompt = opts.players
-    ? roomPrompt(setting, tone, opts.players, opts.culpritAmong)
-    : soloPrompt(setting, tone);
+  if (!opts.players) return attempt("solo", soloPrompt(setting, tone));
 
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // Real player ids are long UUIDs, which language models copy unreliably.
+  // Give the model short ids (p1, p2, ...) and translate back afterwards.
+  const short = opts.players.map((p, i) => ({ id: `p${i + 1}`, name: p.name, real: p.id }));
+  const toShort = new Map(short.map((p) => [p.real, p.id]));
+  const toReal = new Map(short.map((p) => [p.id, p.real]));
+  const shortAmong = opts.culpritAmong?.map((id) => toShort.get(id)!).filter(Boolean);
+  const players = short.map(({ id, name }) => ({ id, name }));
+
+  const result = await attempt("room", roomPrompt(setting, tone, players, shortAmong), players, shortAmong);
+  const f = result.file;
+  const real = (id: string) => toReal.get(id) ?? id;
+  f.suspects = f.suspects.map((s) => ({ ...s, id: real(s.id) }));
+  f.culprit_id = real(f.culprit_id);
+  if (f.hot_seat) f.hot_seat = { ...f.hot_seat, player_id: real(f.hot_seat.player_id) };
+  return result;
+}
+
+async function attempt(
+  mode: "solo" | "room",
+  prompt: { system: string; user: string },
+  players?: { id: string; name: string }[],
+  culpritAmong?: string[],
+): Promise<{ file: CaseFile; source: "ai" | "fallback" }> {
+  for (let n = 0; n < 2; n++) {
     try {
       const raw = await chatJSON({ ...prompt, temperature: 0.95, maxTokens: 3500, groqTimeoutMs: 12000 });
-      return { file: parse(raw, mode, opts.players, opts.culpritAmong), source: "ai" };
+      return { file: parse(raw, mode, players, culpritAmong), source: "ai" };
     } catch (e) {
-      console.warn(`[case] attempt ${attempt + 1} failed:`, (e as Error).message);
+      console.warn(`[case] attempt ${n + 1} failed:`, (e as Error).message);
     }
   }
-  return { file: fallbackFor(opts.players, opts.culpritAmong), source: "fallback" };
+  return { file: fallbackFor(players, culpritAmong), source: "fallback" };
 }
