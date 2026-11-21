@@ -144,13 +144,13 @@ RULES
 - Give it just enough real-world texture: what is at stake, the room it happened in, and everyday evidence anyone understands (a camera recording, a door-card swipe, a phone call, a fingerprint, a receipt, a muddy footprint, a witness).
 - Suspects are believable adults with real jobs and real motives (debt, a passed-over promotion, a rival's offer, a cover-up). Titles are 2-4 words and sound like a case file. Vary them: do not always use the word "Heist" (e.g. "The Missing Painting", "Lot 47", "Night Shift at Gate 3").
 - "facts" states the case in three short plain lines a child could follow: "what" was taken or done (under 10 words), "when" (a time window), "where" (the exact spot).
-- SIMPLE: one thing taken or done, one room, one moment. Do not name a city or real street. Use at most ONE clock time per sentence. Every alibi is under 12 words. Every clue is one sentence under 15 words. A newcomer must understand the whole case in 20 seconds.
+- SIMPLE: one thing taken or done, one room, one moment. Do not name a city, a country or a real street: it must feel like it could be anywhere in the world. Use at most ONE clock time per sentence. Every alibi is under 12 words. Every clue is one sentence under 15 words. A newcomer must understand the whole case in 20 seconds.
 - Decide the culprit, motive, method and timeline FIRST. Then write everything else to be consistent with them.
 - "crime_verb" finishes the sentence "Find who ..." in under 8 words, e.g. "swapped the necklace for a fake".
 - "alibi_hole" is the one concrete, checkable fact that breaks the culprit's public_alibi.
 - "culprit_objective" is a specific false claim the culprit must convince others of, e.g. "Convince everyone the CCTV was already down at 9:40 pm."
 - "innocent_secret" is a private, non-criminal thing the person would rather hide (a secret job interview, a hidden debt, meeting someone they should not, breaking a workplace rule). It explains why they looked suspicious.
-- "intro" (2-3 sentences) sets the scene without naming the culprit.
+- "intro" is 1-2 short sentences, under 28 words in total: what happened and why it matters. Do not name the culprit.
 - "ending_caught" and "ending_escaped" are 2-3 punchy sentences each, written like the last scene of a thriller: who did it, the clever way they did it, and the one slip that caught them (or the nerve that let them walk).
 - VOICE: vivid, tense and fun to read aloud. Sharp details, a twist, a little swagger. Clear on first read.
 - NO TECH JARGON: never say VPN, MAC address, checksum, exfiltrate, metadata, hash, firmware. Say "the door camera", "her phone records", "his fingerprint", "the receipt".
@@ -161,14 +161,14 @@ RULES
 // Models repeat themselves: the same first names, the same guilty slot. So the
 // server deals the names and picks the culprit, and the model writes around them.
 const FIRST_NAMES = [
-  "Ananya", "Arjun", "Meera", "Kabir", "Ishita", "Vikram", "Tara", "Nikhil", "Riya", "Dev",
-  "Sanjana", "Aditya", "Pooja", "Rahul", "Nandini", "Karan", "Diya", "Siddharth", "Leela", "Farhan",
-  "Zoya", "Imran", "Kavya", "Rohan", "Shreya", "Yash", "Mira", "Abhay", "Trisha", "Varun",
-  "Aisha", "Neil", "Priyanka", "Gaurav", "Sana", "Manav", "Anjali", "Dhruv", "Lara", "Samar",
+  "Maya", "Leo", "Sofia", "Noah", "Aisha", "Kenji", "Elena", "Omar", "Zoe", "Lucas",
+  "Priya", "Mateo", "Hana", "Daniel", "Amara", "Ivan", "Chloe", "Arjun", "Nina", "Felix",
+  "Layla", "Marco", "Yuki", "Sam", "Isabel", "Kofi", "Anna", "Ravi", "Emma", "Tariq",
+  "Lena", "Diego", "Mei", "Oscar", "Farah", "Jonas", "Clara", "Dev", "Ruby", "Hugo",
 ];
 const LAST_NAMES = [
-  "Sen", "Bose", "Mukherjee", "Roy", "Ghosh", "Dutta", "Chatterjee", "Banerjee", "Mitra", "Sarkar",
-  "Kapoor", "Mehta", "Agarwal", "Khan", "D'Souza", "Iyer", "Sinha", "Jalan", "Fernandes", "Rao",
+  "Carter", "Rossi", "Tanaka", "Khan", "Silva", "Novak", "Okafor", "Muller", "Dubois", "Kim",
+  "Sharma", "Lopez", "Ivanov", "Hughes", "Park", "Costa", "Reyes", "Larsen", "Ahmed", "Bennett",
 ];
 function shuffled<T>(list: T[]): T[] {
   const a = [...list];
