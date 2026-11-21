@@ -261,9 +261,21 @@ export async function startRoom(
       dealt[p.id] = pick;
       count[pick] = (count[pick] ?? 0) + 1;
     }
+    // Sometimes a second friend is in on it: they know who did it and must help them escape.
+    const culpritRow = humans.find((p) => p.id === file.culprit_id);
+    const mates = humans.filter((p) => p.id !== file.culprit_id);
+    const accomplice = culpritRow && mates.length && Math.random() < 0.4 ? mates[crypto.randomInt(mates.length)] : null;
+    const cardFor = (p: PlayerRow): PlayerCard => {
+      const card = buildCard(file, p.id, dealt[p.id]);
+      if (accomplice && culpritRow && p.id === accomplice.id) {
+        return { ...card, accompliceOf: culpritRow.name, mission: `YOU ARE THE ACCOMPLICE. ${culpritRow.name.split(" ")[0]} did it. Help them escape.` };
+      }
+      if (accomplice && p.id === file.culprit_id) return { ...card, partner: accomplice.name };
+      return card;
+    };
     const lastPowers = Object.fromEntries(humans.map((p) => [p.id, p.id === file.culprit_id ? (last[p.id] ?? "") : dealt[p.id]]));
     await Promise.all(
-      players.map((p) => db.updatePlayer(p.id, { card: buildCard(file, p.id, dealt[p.id]), vote: null, doubt: null })),
+      players.map((p) => db.updatePlayer(p.id, { card: cardFor(p), vote: null, doubt: null })),
     );
     const t = timings(merged);
     await db.updateRoomIf(code, "generating", {
@@ -299,6 +311,8 @@ export function escapedEnding(file: CaseFile): string {
 function buildReveal(file: CaseFile, players: PlayerRow[], fx?: RoomSettings["fx"]): RoomReveal {
   const nameOf = (id: string | null) => players.find((p) => p.id === id)?.name ?? "nobody";
   const tricks: string[] = [];
+  const helper = players.find((p) => p.card?.accompliceOf);
+  if (helper) tricks.push(`${helper.name} was the secret accomplice`);
   for (const p of fx?.planted ?? []) tricks.push(`${nameOf(p.byId)} planted fake evidence against ${nameOf(p.targetId)}`);
   if (fx?.blackoutBy) tricks.push(`${nameOf(fx.blackoutBy)} cut the lights`);
   for (const id of fx?.detectors ?? []) tricks.push(`${nameOf(id)} used a lie detector`);
@@ -321,6 +335,7 @@ function buildReveal(file: CaseFile, players: PlayerRow[], fx?: RoomSettings["fx
     story: caught ? file.ending_caught : `${framed}${noVerdict}${escapedEnding(file)}`,
     narration: narrationOf(file, caught),
     roast: file.roast,
+    accompliceId: helper?.id ?? null,
     why: file.motive,
     how: file.method,
     votes: players

@@ -156,6 +156,10 @@ export interface RoomSettings {
 
 export interface PlayerCard {
   role: Role;
+  /** Set on the accomplice: the culprit's name. They win if the culprit escapes. */
+  accompliceOf?: string;
+  /** Set on the culprit when a friend is secretly helping them. */
+  partner?: string;
   mission: string; // ONE line, e.g. "YOU ARE INNOCENT. Find who stole the rosogolla."
   clues: string[]; // exactly 2
   objective?: string; // culprit only
@@ -177,6 +181,8 @@ export interface RoomReveal {
   /** Exactly what the narrator reads. Its audio is prepared during the discussion. */
   narration: string;
   roast: string;
+  /** A real player who secretly helped the culprit, if there was one. */
+  accompliceId?: string | null;
   /** Why the culprit did it, and how. Always shown at the end. */
   why?: string;
   how?: string;

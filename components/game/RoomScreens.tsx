@@ -274,13 +274,14 @@ function Line({ k, v, color }: { k: string; v: string; color: string }) {
 /** Everything one player needs: who they are, what to say, what they know. */
 function RoleCard({ card, compact = false }: { card: PlayerCard; compact?: boolean }) {
   const culprit = card.role === "culprit";
-  const color = culprit ? "#F0385A" : "#5FDDF7";
+  const dark = culprit || Boolean(card.accompliceOf);
+  const color = dark ? "#F0385A" : "#5FDDF7";
   const [head, ...rest] = card.mission.split(". ");
   return (
     <div
       className="rounded-[16px] p-4"
       style={{
-        background: culprit ? "linear-gradient(180deg, rgba(240,56,90,.24), rgba(40,10,22,.9))" : "linear-gradient(180deg, rgba(95,221,247,.2), rgba(8,22,38,.9))",
+        background: dark ? "linear-gradient(180deg, rgba(240,56,90,.24), rgba(40,10,22,.9))" : "linear-gradient(180deg, rgba(95,221,247,.2), rgba(8,22,38,.9))",
         boxShadow: `inset 0 0 0 1.5px ${color}, 0 0 26px ${color}33`,
       }}
     >
@@ -290,7 +291,9 @@ function RoleCard({ card, compact = false }: { card: PlayerCard; compact?: boole
       <p className="m-0 mt-1 text-[14.5px] leading-snug">
         {culprit
           ? "You did it. Stay calm, tell your cover story, and get them to accuse someone else."
-          : `${rest.join(". ")} Tell people what you saw.`}
+          : card.accompliceOf
+            ? `${card.accompliceOf} did it, and only you know. Protect them: back up their story and push the room to accuse someone else. You win if they escape.`
+            : `${rest.join(". ")} Tell people what you saw.`}
       </p>
       <div className="mt-3 flex flex-col gap-1.5">
         {card.job && <Line k="In this case you are" v={card.job} color={color} />}
@@ -299,6 +302,7 @@ function RoleCard({ card, compact = false }: { card: PlayerCard; compact?: boole
           <Line key={i} k={culprit ? "Use this to blame someone" : "What you saw · tell the room"} v={c} color={color} />
         ))}
         {card.objective && <Line k="The lie you need them to believe" v={card.objective} color="#ff8098" />}
+        {card.partner && <Line k="Your secret accomplice" v={`${card.partner} knows you did it and will help you. Work together.`} color="#ff8098" />}
         {card.role === "culprit" ? (
           <Line k="Your secret powers · once each" v="Plant fake evidence against someone. Cut the lights for 10 seconds." color="#ff8098" />
         ) : (
@@ -1107,7 +1111,7 @@ export function Verdict({ room, actions }: Props) {
     setVoice("playing");
   }
 
-  const youWon = you ? (you.id === r.culpritId ? !r.caught : r.caught) : false;
+  const youWon = you ? (you.id === r.culpritId || you.id === r.accompliceId ? !r.caught : r.caught) : false;
 
   return (
     <main className={`screen ${r.caught ? "alarm" : "warm"}`}>
