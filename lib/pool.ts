@@ -1,3 +1,4 @@
+import { sanitizeCase } from "./generate-case";
 import { database } from "./store";
 import type { CaseFile, Tone } from "./types";
 
@@ -42,5 +43,5 @@ export async function drawCase(
   if (!fresh.length) return null;
   const pick = fresh[Math.floor(Math.random() * fresh.length)];
   const { data } = await db.from("case_pool").select("case_file").eq("id", pick.id).maybeSingle();
-  return data ? { file: data.case_file as CaseFile, size: rows.length } : null;
+  return data ? { file: sanitizeCase(data.case_file as CaseFile), size: rows.length } : null;
 }

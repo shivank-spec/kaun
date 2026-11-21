@@ -1,30 +1,45 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { sfx, unlockSfx } from "@/components/ui/kit";
 import type { LeaderboardView, Tone } from "@/lib/types";
 
-const SETTINGS = ["Kolkata", "This hackathon room"] as const;
+type SettingId = "kolkata" | "room" | "custom";
+const SETTINGS: { id: SettingId; label: string; value: string }[] = [
+  { id: "kolkata", label: "Kolkata", value: "Kolkata" },
+  { id: "room", label: "This Room", value: "This hackathon room" },
+  { id: "custom", label: "Custom", value: "" },
+];
 
 export default function Home() {
   const router = useRouter();
-  const [setting, setSetting] = useState<string>("Kolkata");
+  const [settingId, setSettingId] = useState<SettingId>("kolkata");
   const [custom, setCustom] = useState("");
   const [tone, setTone] = useState<Tone>("desi");
-  const [mode, setMode] = useState<"menu" | "host" | "join">("menu");
+  const [code, setCode] = useState(["", "", "", ""]);
+  const [sheet, setSheet] = useState<null | "settings" | "name">(null);
   const [name, setName] = useState("");
-  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [msg, setMsg] = useState("");
   const [demo, setDemo] = useState(false);
   const [rejoin, setRejoin] = useState<string | null>(null);
   const [board, setBoard] = useState<LeaderboardView | null>(null);
+  const cells = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     setDemo(q.get("demo") === "true");
     setName(localStorage.getItem("kaun.name") || "");
-    // Reconnect: if a game is in progress, offer to jump back in.
+    const saved = localStorage.getItem("kaun.prefs");
+    if (saved) {
+      try {
+        const p = JSON.parse(saved);
+        if (p.settingId) setSettingId(p.settingId);
+        if (p.custom) setCustom(p.custom);
+        if (p.tone) setTone(p.tone);
+      } catch {}
+    }
     // If this phone was in a game that is still running, offer a way back in.
     try {
       const sess = JSON.parse(localStorage.getItem("kaun.session") || "null");
@@ -39,25 +54,44 @@ export default function Home() {
       .then((r) => (r.ok ? r.json() : null))
       .then(setBoard)
       .catch(() => {});
-    const join = q.get("join");
-    if (join) {
-      setCode(join.toUpperCase().slice(0, 4));
-      setMode("join");
-    }
   }, []);
 
-  const chosenSetting = custom.trim() || setting;
-  const soloHref = `/solo?setting=${encodeURIComponent(chosenSetting)}&tone=${tone}`;
+  useEffect(() => {
+    localStorage.setItem("kaun.prefs", JSON.stringify({ settingId, custom, tone }));
+  }, [settingId, custom, tone]);
+
+  const setting =
+    settingId === "custom" ? custom.trim() || "Kolkata" : SETTINGS.find((s) => s.id === settingId)!.value;
+
+  function typeCell(i: number, raw: string) {
+    const letters = raw.replace(/[^a-zA-Z]/g, "").toUpperCase();
+    // A paste of the whole code lands in one cell: spread it out.
+    const next = [...code];
+    if (letters.length > 1) {
+      letters.slice(0, 4).split("").forEach((ch, k) => (next[k] = ch));
+    } else {
+      next[i] = letters;
+    }
+    setCode(next);
+    setMsg("");
+    const filled = next.join("");
+    if (filled.length === 4) {
+      sfx.tap();
+      router.push(`/room/${filled}`);
+    } else if (letters && i < 3) {
+      cells.current[i + 1]?.focus();
+    }
+  }
 
   async function host() {
-    if (!name.trim()) return setError("Enter your name");
+    if (!name.trim()) return setMsg("Enter your name");
     setBusy(true);
-    setError("");
+    setMsg("");
     try {
       const res = await fetch("/api/room", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, setting: chosenSetting, tone, demo }),
+        body: JSON.stringify({ name, setting, tone, demo }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -68,143 +102,232 @@ export default function Home() {
       );
       router.push(`/room/${data.code}`);
     } catch (e) {
-      setError((e as Error).message || "Could not create a room");
+      setMsg((e as Error).message || "Could not create a room");
       setBusy(false);
     }
   }
 
-  function join() {
-    if (code.length !== 4) return setError("Enter the 4-letter code");
-    router.push(`/room/${code}`);
-  }
+  const status = msg
+    ? msg
+    : board && board.playedToday > 0
+      ? `${board.playedToday} cases played today${board.top[0] ? ` · top ${board.top[0].name} ${board.top[0].score}` : ""}`
+      : "Enter a room code to join";
 
   return (
-    <main className="relative z-10 flex min-h-dvh flex-col px-6 pb-8 pt-14">
-      <div className="rise">
-        <p className="font-type text-xs tracking-[0.3em] text-taxi">CASE FILE · KOLKATA</p>
-        <h1 className="mt-3 font-serif text-[5.5rem] leading-[0.85]">Kaun?</h1>
-        <p className="mt-4 max-w-[17rem] text-lg leading-snug text-paper/80">
-          A new mystery every 3 minutes. One of them is lying.
-        </p>
+    <main className="screen" onPointerDown={unlockSfx}>
+      <header className="flex h-11 shrink-0 items-center justify-between">
+        <span className="display text-[20px] tracking-[0.02em]">KAUN?</span>
+        <button
+          type="button"
+          aria-label="Settings"
+          onClick={() => setSheet("settings")}
+          className="tap flex h-11 w-11 items-center justify-end border-0 bg-transparent text-snow"
+        >
+          <Gear size={24} />
+        </button>
+      </header>
+
+      {/* The cube takes whatever height is left, so tall and short phones both look composed. */}
+      <div className="flex min-h-[120px] flex-1 items-center justify-center" aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/art/cube.png"
+          alt=""
+          className="h-full max-h-[300px] w-auto object-contain"
+          style={{ animation: "floaty 7s ease-in-out infinite", filter: "drop-shadow(0 0 30px rgba(95,221,247,.25))" }}
+        />
       </div>
 
-      <div className="mt-auto space-y-3 pt-10">
-        {mode === "menu" && (
-          <>
-            <div className="mb-4 space-y-3 rise">
-              <div>
-                <p className="mb-2 font-type text-[0.7rem] tracking-[0.2em] text-muted">WHERE</p>
-                <div className="flex gap-2">
-                  {SETTINGS.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => {
-                        setSetting(s);
-                        setCustom("");
-                      }}
-                      className={`min-h-11 flex-1 rounded-full border px-3 text-sm ${
-                        !custom.trim() && setting === s
-                          ? "border-taxi bg-taxi/15 text-taxi"
-                          : "border-paper/20 text-paper/70"
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-                <input
-                  value={custom}
-                  onChange={(e) => setCustom(e.target.value.slice(0, 30))}
-                  placeholder="or type your own: our college canteen"
-                  className="mt-2 min-h-11 w-full rounded-full border border-paper/20 bg-transparent px-4 text-sm outline-none placeholder:text-paper/35 focus:border-taxi"
-                />
+      <div className="flex shrink-0 flex-col items-center gap-1.5 pb-[clamp(16px,4vh,36px)]">
+        <h1 className="display m-0 text-[clamp(56px,19vw,78px)] leading-none tracking-[-0.03em]" aria-label="Kaun?">
+          <span className="metal">Kaun</span>
+          <span style={{ color: "#5FDDF7", WebkitTextFillColor: "#5FDDF7", textShadow: "0 0 22px rgba(95,221,247,.55)" }}>
+            ?
+          </span>
+        </h1>
+        <p className="m-0 text-[17px] text-[#E3E8F2]">Find the culprit. Hide your role.</p>
+      </div>
+
+      <div className="flex shrink-0 flex-col gap-3">
+        {rejoin && (
+          <button type="button" className="btn btn-danger tap rise" onClick={() => router.push(`/room/${rejoin}`)}>
+            Rejoin room {rejoin}
+          </button>
+        )}
+        <button
+          type="button"
+          className="btn btn-primary tap"
+          onClick={() => {
+            sfx.tap();
+            setSheet("name");
+          }}
+        >
+          <People />
+          Play with Friends
+        </button>
+        <button
+          type="button"
+          className="btn btn-glass tap justify-between px-5"
+          onClick={() => {
+            sfx.tap();
+            router.push(`/solo?setting=${encodeURIComponent(setting)}&tone=${tone}`);
+          }}
+        >
+          <span className="flex items-center gap-2.5">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M7 4v16l13-8z" />
+            </svg>
+            Play Solo
+          </span>
+          <span className="mono text-[14px] font-medium text-mist">02:30</span>
+        </button>
+
+        <div role="group" aria-label="Room code" className="mt-1 flex justify-center gap-3">
+          {code.map((ch, i) => (
+            <input
+              key={i}
+              ref={(el) => {
+                cells.current[i] = el;
+              }}
+              value={ch}
+              inputMode="text"
+              autoCapitalize="characters"
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={4}
+              placeholder={"ABCD"[i]}
+              aria-label={`Room code letter ${i + 1}`}
+              onChange={(e) => typeCell(i, e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Backspace" && !code[i] && i > 0) {
+                  const next = [...code];
+                  next[i - 1] = "";
+                  setCode(next);
+                  cells.current[i - 1]?.focus();
+                }
+              }}
+              className="h-[58px] w-[58px] rounded-[12px] border-0 p-0 text-center text-[26px] font-bold uppercase text-snow outline-none placeholder:text-[#59627a]"
+              style={{
+                background: "linear-gradient(180deg, rgba(28,40,66,.94), rgba(12,18,34,.94))",
+                boxShadow: `inset 0 0 0 1px ${ch ? "#5FDDF7" : "rgba(130,180,230,.28)"}, inset 0 1px 0 rgba(255,255,255,.12)`,
+              }}
+            />
+          ))}
+        </div>
+        <p role="status" className="label m-0 h-[14px] text-center text-snow">
+          {status}
+        </p>
+
+        <div className="grid grid-cols-2 gap-3">
+          <button type="button" className="btn btn-glass tap !min-h-12 !rounded-full !text-[15px] !font-medium" onClick={() => setSheet("settings")}>
+            <Gear size={18} />
+            {SETTINGS.find((s) => s.id === settingId)!.label === "Custom" ? custom.trim() || "Custom" : SETTINGS.find((s) => s.id === settingId)!.label}
+          </button>
+          <button
+            type="button"
+            className="btn btn-glass tap !min-h-12 !rounded-full !text-[15px] !font-medium"
+            aria-label={`Narrator: ${tone === "desi" ? "Desi Drama" : "Noir"}. Tap to switch.`}
+            onClick={() => {
+              sfx.tap();
+              setTone(tone === "desi" ? "noir" : "desi");
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 9.5v5h3.5L12 18V6L7.500 9.500zM15.500 9a4 4 0 0 1 0 6M18 6.500a7.500 7.500 0 0 1 0 11" />
+            </svg>
+            {tone === "desi" ? "Desi Drama" : "Noir"}
+          </button>
+        </div>
+      </div>
+
+      {sheet === "settings" && (
+        <div className="scrim" role="dialog" aria-label="Settings">
+          <button type="button" aria-label="Close" className="flex-1 border-0 bg-transparent" onClick={() => setSheet(null)} />
+          <div className="sheet flex flex-col gap-4 p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
+            <span className="display text-[24px]">Settings</span>
+            <div className="flex flex-col gap-2">
+              <span className="eyebrow">Where it happens</span>
+              <div className="grid grid-cols-3 gap-1.5">
+                {SETTINGS.map((s) => (
+                  <button key={s.id} type="button" className="chip tap" aria-pressed={settingId === s.id} onClick={() => setSettingId(s.id)}>
+                    {s.label}
+                  </button>
+                ))}
               </div>
-              <div>
-                <p className="mb-2 font-type text-[0.7rem] tracking-[0.2em] text-muted">NARRATOR</p>
-                <div className="flex gap-2">
-                  {(
-                    [
-                      ["desi", "Desi Drama"],
-                      ["noir", "Noir"],
-                    ] as const
-                  ).map(([t, label]) => (
-                    <button
-                      key={t}
-                      onClick={() => setTone(t)}
-                      className={`min-h-11 flex-1 rounded-full border px-3 text-sm ${
-                        tone === t ? "border-taxi bg-taxi/15 text-taxi" : "border-paper/20 text-paper/70"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
+              {settingId === "custom" && (
+                <input
+                  autoFocus
+                  className="field"
+                  placeholder="Up to 3 words: our college canteen"
+                  value={custom}
+                  onChange={(e) => {
+                    const w = e.target.value.split(/\s+/).filter(Boolean);
+                    setCustom(w.length > 3 ? w.slice(0, 3).join(" ") : e.target.value.slice(0, 36));
+                  }}
+                />
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="eyebrow">Narrator</span>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button type="button" className="chip tap" aria-pressed={tone === "desi"} onClick={() => setTone("desi")}>
+                  Desi Drama
+                </button>
+                <button type="button" className="chip tap" aria-pressed={tone === "noir"} onClick={() => setTone("noir")}>
+                  Noir
+                </button>
               </div>
             </div>
-            {rejoin && (
-              <button className="btn btn-danger" onClick={() => router.push(`/room/${rejoin}`)}>
-                Rejoin room {rejoin}
-              </button>
-            )}
-            <button className="btn btn-primary" onClick={() => router.push(soloHref)}>
-              Play solo
+            <button type="button" className="btn btn-primary tap" onClick={() => setSheet(null)}>
+              Done
             </button>
-            <button className="btn btn-ghost" onClick={() => setMode("host")}>
-              Play with friends
-            </button>
-            <button className="btn btn-ghost" onClick={() => setMode("join")}>
-              Join with code
-            </button>
-          </>
-        )}
+          </div>
+        </div>
+      )}
 
-        {mode === "host" && (
-          <div className="space-y-3 rise">
-            <p className="font-serif text-3xl">Your name, detective?</p>
+      {sheet === "name" && (
+        <div className="scrim" role="dialog" aria-label="Your name">
+          <button type="button" aria-label="Close" className="flex-1 border-0 bg-transparent" onClick={() => setSheet(null)} />
+          <div className="sheet flex flex-col gap-4 p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
+            <div>
+              <span className="eyebrow">Party room</span>
+              <p className="display m-0 mt-1 text-[24px]">What should we call you?</p>
+            </div>
             <input
               autoFocus
+              className="field"
+              placeholder="Your name"
               value={name}
-              onChange={(e) => setName(e.target.value.slice(0, 16))}
+              maxLength={16}
+              onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && host()}
-              placeholder="Name"
-              className="min-h-14 w-full rounded-xl border border-paper/25 bg-transparent px-4 text-lg outline-none focus:border-taxi"
             />
-            <button className="btn btn-primary" disabled={busy} onClick={host}>
-              {busy ? "Opening room…" : "Create room"}
-            </button>
-            <button className="btn btn-ghost" onClick={() => setMode("menu")}>
-              Back
+            {msg && <p className="m-0 text-[14px] text-[#ff8098]">{msg}</p>}
+            <button type="button" className="btn btn-primary tap" disabled={busy} onClick={host}>
+              {busy ? "Opening room" : "Create room"}
             </button>
           </div>
-        )}
-
-        {mode === "join" && (
-          <div className="space-y-3 rise">
-            <p className="font-serif text-3xl">Enter the room code</p>
-            <input
-              autoFocus
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/[^a-zA-Z]/g, "").toUpperCase().slice(0, 4))}
-              onKeyDown={(e) => e.key === "Enter" && join()}
-              placeholder="ABCD"
-              className="min-h-16 w-full rounded-xl border border-paper/25 bg-transparent text-center font-type text-4xl tracking-[0.4em] outline-none focus:border-taxi"
-            />
-            <button className="btn btn-primary" onClick={join}>
-              Join
-            </button>
-            <button className="btn btn-ghost" onClick={() => setMode("menu")}>
-              Back
-            </button>
-          </div>
-        )}
-
-        {error && <p className="text-center text-sm text-culprit">{error}</p>}
-        <p className="pt-2 text-center font-type text-[0.65rem] tracking-[0.15em] text-muted">
-          {board && board.playedToday > 0
-            ? `${board.playedToday} CASES PLAYED TODAY · TOP: ${board.top[0]?.name?.toUpperCase() ?? "NOBODY YET"} ${board.top[0]?.score ?? ""}`
-            : "NO SIGN-UP · 3 MINUTES · PLAY AGAIN FOREVER"}
-        </p>
-      </div>
+        </div>
+      )}
     </main>
+  );
+}
+
+function Gear({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" />
+    </svg>
+  );
+}
+function People() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="12" cy="7" r="3.4" />
+      <path d="M5 20c0-3.900 3.100-6.500 7-6.500s7 2.600 7 6.500z" />
+      <circle cx="5.5" cy="9.5" r="2.3" />
+      <circle cx="18.5" cy="9.5" r="2.3" />
+    </svg>
   );
 }

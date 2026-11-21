@@ -169,7 +169,7 @@ export async function startRoom(
       culpritAmong: humans.map((p) => p.id),
     });
     await Promise.all(
-      players.map((p) => db.updatePlayer(p.id, { card: buildCard(file, p.id), vote: null })),
+      players.map((p) => db.updatePlayer(p.id, { card: buildCard(file, p.id), vote: null, doubt: null })),
     );
     const t = merged.demo ? SECONDS.demo : SECONDS.normal;
     await db.updateRoomIf(code, "generating", {
@@ -229,6 +229,20 @@ export async function castVote(codeRaw: string, playerId: string, targetId: stri
   if (!players.some((p) => p.id === targetId)) throw new GameError("Unknown player");
   if (targetId === playerId) throw new GameError("You cannot vote for yourself");
   await db.updatePlayer(playerId, { vote: targetId });
+  return { ok: true };
+}
+
+/** Mark (or clear) who you doubt. Feeds the live suspicion meters. */
+export async function setDoubt(codeRaw: string, playerId: string, targetId: string | null) {
+  const code = codeRaw.toUpperCase();
+  const db = store();
+  const room = await db.getRoom(code);
+  if (!room) throw new GameError("No room with that code", 404);
+  if (room.status !== "discuss" && room.status !== "vote") return { ok: true };
+  const players = await db.listPlayers(code);
+  if (!players.some((p) => p.id === playerId)) throw new GameError("You are not in this room", 403);
+  const target = targetId && targetId !== playerId && players.some((p) => p.id === targetId) ? targetId : null;
+  await db.updatePlayer(playerId, { doubt: target });
   return { ok: true };
 }
 
@@ -320,6 +334,12 @@ export async function getRoomView(codeRaw: string, playerId: string | null): Pro
   const me = players.find((p) => p.id === playerId) ?? null;
   const showCard = room.status !== "lobby" && room.status !== "generating";
   const f = room.case_file;
+  const humans = players.filter((p) => !p.is_bot);
+  const doubtOf = (id: string) => {
+    const voters = humans.filter((p) => p.id !== id);
+    if (!voters.length) return 0;
+    return Math.round((voters.filter((p) => p.doubt === id).length / voters.length) * 100);
+  };
   return {
     code: room.code,
     status: room.status,
@@ -331,6 +351,7 @@ export async function getRoomView(codeRaw: string, playerId: string | null): Pro
       name: p.name,
       isHost: p.is_host,
       hasVoted: Boolean(p.vote),
+      doubt: doubtOf(p.id),
       ...(p.is_bot ? { isBot: true } : {}),
       ...(showCard && f
         ? (() => {
@@ -339,7 +360,16 @@ export async function getRoomView(codeRaw: string, playerId: string | null): Pro
           })()
         : {}),
     })),
-    you: me ? { id: me.id, name: me.name, isHost: me.is_host, card: showCard ? me.card : null } : null,
+    you: me
+      ? {
+          id: me.id,
+          name: me.name,
+          isHost: me.is_host,
+          card: showCard ? me.card : null,
+          doubting: me.doubt ?? null,
+          votedFor: me.vote ?? null,
+        }
+      : null,
     case: f && showCard ? { title: f.title, crime: f.crime, intro: f.intro, setting: f.setting } : null,
     reveal: room.status === "reveal" ? room.reveal : null,
     hotSeat: hotSeatNow(room, players),

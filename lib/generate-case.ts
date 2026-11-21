@@ -53,6 +53,30 @@ const CaseZ = z.object({
   hot_seat: z.object({ player_id: str, question: str }).optional(),
 });
 
+/**
+ * Models sometimes write an internal id ("s3", "p2") where a name belongs.
+ * Swap every such id for the person's name so players never see one.
+ */
+export function sanitizeCase(c: CaseFile): CaseFile {
+  const names = new Map(c.suspects.map((s) => [s.id.toLowerCase(), s.name.split(" ")[0]]));
+  const fix = (t: string) =>
+    t.replace(/\b([sp][1-8])\b/gi, (m) => names.get(m.toLowerCase()) ?? m);
+  const out = structuredClone(c);
+  for (const k of ["title", "crime", "intro", "motive", "method", "alibi_hole", "culprit_objective", "ending_caught", "ending_escaped", "roast"] as const) {
+    out[k] = fix(out[k]);
+  }
+  out.timeline = out.timeline.map(fix);
+  out.clues = out.clues.map((k) => ({ ...k, text: fix(k.text) }));
+  out.suspects = out.suspects.map((s) => ({
+    ...s,
+    public_alibi: fix(s.public_alibi),
+    innocent_secret: fix(s.innocent_secret),
+    private_clues: s.private_clues?.map(fix),
+  }));
+  if (out.hot_seat) out.hot_seat = { ...out.hot_seat, question: fix(out.hot_seat.question) };
+  return out;
+}
+
 /** Logic check: the puzzle must actually be solvable. Returns an error string or null. */
 export function validateCase(c: CaseFile, mode: "solo" | "room"): string | null {
   const ids = new Set(c.suspects.map((s) => s.id));
@@ -193,7 +217,7 @@ function parse(
   players?: { id: string; name: string }[],
   culpritAmong?: string[],
 ) {
-  const c = CaseZ.parse(raw) as CaseFile;
+  const c = sanitizeCase(CaseZ.parse(raw) as CaseFile);
   if (players) {
     // Force exact ids and names so cards always map to real players.
     const byId = new Map(c.suspects.map((s) => [s.id, s]));

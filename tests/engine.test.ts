@@ -38,6 +38,14 @@ test("the browser's view of a solo case never contains the answer", () => {
   assert.ok(!view.includes("culprit_id"));
 });
 
+test("map spots hand out only the red herrings, never a true clue", () => {
+  const file = FALLBACK_CASES[0];
+  const view = toSoloView(file, "desi");
+  const trueIds = file.clues.filter((k) => !k.is_red_herring).map((k) => k.id);
+  assert.ok(view.spots.every((s) => !trueIds.includes(s.id)));
+  assert.equal(view.actions, 6);
+});
+
 test("scoring rewards the right accusation, clues and speed", () => {
   const file = FALLBACK_CASES[0];
   const { caseId } = toSoloView(file, "desi");
@@ -49,4 +57,7 @@ test("scoring rewards the right accusation, clues and speed", () => {
   assert.ok(fast.correct && fast.score > slow.score);
   assert.ok(!miss.correct && miss.score < slow.score);
   assert.equal(fast.cluesFound, 3);
+  const cracked = accuse(caseId, file.culprit_id, trueClues, 30, trueClues);
+  assert.equal(cracked.contradictions, 2);
+  assert.ok(cracked.score > fast.score);
 });

@@ -51,3 +51,5 @@ create table if not exists tts_cache (
   created_at timestamptz not null default now()
 );
 alter table tts_cache enable row level security;
+-- Who each player currently doubts (live suspicion meter during discussion).
+alter table players add column if not exists doubt uuid;

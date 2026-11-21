@@ -22,6 +22,7 @@ export interface PlayerRow {
   is_bot?: boolean;
   card: PlayerCard | null;
   vote: string | null;
+  doubt?: string | null;
   joined_at: string;
 }
 
@@ -74,7 +75,7 @@ const memoryStore: Store = {
     for (const p of [...mem.players.values()]) {
       if (p.room_code !== code) continue;
       if (p.is_bot) mem.players.delete(p.id);
-      else mem.players.set(p.id, { ...p, card: null, vote: null });
+      else mem.players.set(p.id, { ...p, card: null, vote: null, doubt: null });
     }
   },
 };
@@ -115,7 +116,7 @@ function supabaseStore(db: SupabaseClient): Store {
     },
     async resetPlayers(code) {
       must(await db.from("players").delete().eq("room_code", code).eq("is_bot", true));
-      must(await db.from("players").update({ card: null, vote: null }).eq("room_code", code));
+      must(await db.from("players").update({ card: null, vote: null, doubt: null }).eq("room_code", code));
     },
   };
 }

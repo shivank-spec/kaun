@@ -52,7 +52,18 @@ export interface PublicSuspect {
   name: string;
   role: string;
   public_alibi: string;
+  room: number; // 0-3: which room of the map they stand in
 }
+
+/** A glowing spot on the solo map. Inspecting it is free and may add a clue. */
+export interface MapSpot {
+  id: string; // a clue id, or "scene"
+  room: number;
+  label: string;
+  text: string;
+}
+
+export type AskMode = "ask" | "press" | "confront";
 
 export interface SoloCaseView {
   caseId: string;
@@ -63,6 +74,8 @@ export interface SoloCaseView {
   suspects: PublicSuspect[];
   totalClues: number; // 5 (3 true + 2 red herrings; the player must judge which matter)
   durationSec: number; // 150
+  actions: number; // 6: ask costs 1, press costs 2, confront costs 1
+  spots: MapSpot[];
 }
 
 export interface ChatMessage {
@@ -73,6 +86,10 @@ export interface ChatMessage {
 export interface InterrogateResponse {
   reply: string;
   unlockedClue: { id: string; text: string } | null;
+  /** Confronting the culprit with real evidence breaks their story. */
+  contradiction?: boolean;
+  /** This suspect explained themselves and is no longer suspicious. */
+  cleared?: boolean;
 }
 
 export interface SoloVerdict {
@@ -84,6 +101,7 @@ export interface SoloVerdict {
   motive: string;
   score: number; // 0-1000
   cluesFound: number;
+  contradictions: number;
   leaderboard?: LeaderboardView;
 }
 
@@ -143,8 +161,17 @@ export interface RoomView {
     caseRole?: string;
     /** From briefing onwards: where they claim they were, e.g. "At the snack bar". Public. */
     alibi?: string;
+    /** 0-100: share of the other players who currently doubt this player. */
+    doubt?: number;
   }[];
-  you: { id: string; name: string; isHost: boolean; card: PlayerCard | null } | null;
+  you: {
+    id: string;
+    name: string;
+    isHost: boolean;
+    card: PlayerCard | null;
+    doubting?: string | null; // who you currently doubt
+    votedFor?: string | null;
+  } | null;
   case: { title: string; crime: string; intro: string; setting?: string } | null; // null in lobby
   reveal: RoomReveal | null; // only in "reveal"
   /** Mid-discussion twist. Non-null for ~15 s: freeze the screen and show it to everyone. */

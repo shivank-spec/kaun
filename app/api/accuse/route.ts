@@ -10,7 +10,8 @@ export async function POST(req: Request) {
     const b = await body(req);
     if (typeof b.caseId !== "string" || typeof b.suspectId !== "string") throw new GameError("Pick a suspect");
     const found = (Array.isArray(b.foundClueIds) ? b.foundClueIds : []) as string[];
-    const verdict = accuse(b.caseId, b.suspectId, found, Number(b.secondsUsed) || 0);
+    const confronted = (Array.isArray(b.confrontedClueIds) ? b.confrontedClueIds : []) as string[];
+    const verdict = accuse(b.caseId, b.suspectId, found, Number(b.secondsUsed) || 0, confronted);
     const name = String(b.name ?? "").replace(/\s+/g, " ").trim().slice(0, 16) || "Anonymous";
     await saveScore({
       name,
