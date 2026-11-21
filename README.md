@@ -14,22 +14,24 @@ _Link added at submission._
 
 ## How a round works
 
-**Solo (2.5 minutes, 6 moves)**
-1. Tap **Play Solo**. A new case opens: a missing rosogolla at KC Das, an unplugged router on the hackathon floor, or a setting you type yourself.
-2. You get a map of the scene, four suspects and **six moves**. Tap a glowing spot to search it. Tap a suspect to walk up to them.
-3. **Ask** (1 move) gets an answer and sometimes a clue. **Press** (2 moves) makes an innocent suspect crack and admit their embarrassing secret. **Confront** (1 move) puts a piece of evidence in front of them: do it to the culprit with real evidence and their story breaks.
-4. The evidence lying around the scene points at the wrong people. The truth comes from the witnesses. Accuse someone before the clock or your moves run out.
+**Solo (under 3 minutes)**
+1. Tap **Play Solo**. A new case opens in a neutral setting anyone can picture: a locker room, a studio, a lab, a kitchen.
+2. You get the crime (what, when, where), four suspects and a small number of moves. Search the scene, then tap a suspect to question them.
+3. **Ask** gets an answer and sometimes a clue. **Push harder** makes an innocent suspect admit their embarrassing secret. **Show them evidence** breaks the culprit's story if the evidence is real.
+4. Accuse someone before the clock or your moves run out.
 5. The narrator reads the reveal, you earn XP, and your score goes on today's leaderboard.
 
-**With friends (2.5 minutes)**
-1. Tap **Play with friends** and share the 4-letter code or QR. Friends join with only a name.
-2. Every phone shows a secret card: **YOU ARE INNOCENT** with two things you saw, or **YOU ARE THE CULPRIT** with a lie you must sell.
-3. Argue out loud for 100 seconds. Tap a player to mark who you doubt, and everyone's **doubt meter** moves live. Halfway through, the **Hot Seat** freezes every screen and puts one player on the spot with an awkward question.
-4. Everyone votes on their phone. The narrator reveals the truth and roasts the culprit. One tap plays again with a new case.
+**With friends**
+1. Tap **Play with Friends** and share the 4-letter code or QR. Friends join with only a name.
+2. A room always has **six to eight suspects and never an empty seat**. AI suspects fill the seats your friends do not, with different names in every room.
+3. Every phone shows a secret card: **INNOCENT** with what you saw, **CULPRIT** with a lie to sell, or sometimes **ACCOMPLICE**: you know who did it and must help them escape.
+4. Talk it out loud. Tap any suspect to question them: an AI suspect answers in character (and lies if guilty), a friend gets the question on their own screen and answers out loud.
+5. **Secret powers, one use each, different every round.** Innocents get a Lie detector (is this evidence planted?), Rule out two (cross two innocent suspects off your list) or a Double vote. The culprit can plant fake evidence or cut the lights, which destroys one piece of evidence for good.
+6. Everyone votes. The end screen shows who did it, **why**, how the room voted, and every dirty trick that was played. One tap plays again with a new case.
 
-A room always has at least five suspects. If fewer friends are playing, AI suspects fill the seats: their evidence drops into the room one piece at a time during the discussion, and they vote.
+In rooms with fewer than four friends, an AI suspect can be the culprit. It frames a real player, cuts the lights, or both, and never votes for itself.
 
-There are three difficulty levels. New players start on Easy and a three-step "How to play" appears the first time.
+There are three difficulty levels. New players start on Easy and a three-step "How to play" appears the first time. The host can pause the clock or end a phase early at any time.
 
 ## How it meets the three Play rules
 
@@ -37,12 +39,12 @@ There are three difficulty levels. New players start on Easy and a three-step "H
 |---|---|
 | No sign-up, in within a minute | No accounts or email. A name and a 4-letter code. Solo needs nothing at all. |
 | Understood in 30 seconds | Every screen leads with one line: who you are and what to do. No rulebook. |
-| One round under 3 minutes | A server-owned clock: 20 s to read your card, 100 s to argue, 30 s to vote. |
+| One round under 3 minutes | Solo runs on a 2:00 to 2:50 clock. With friends the server owns the clock and the host ends the discussion as soon as the room is ready; left alone, the longest setting gives 3:00 of discussion. |
 
 ## What the AI actually does
 
 - **Writes a solvable puzzle, not a loose story.** The model returns structured JSON: it picks the culprit first, then a motive, a method and a timeline, then three true clues each held by a different innocent, two red herrings explained by harmless secrets, the hole in the culprit's alibi, and a lie the culprit must push. `validateCase` in `lib/generate-case.ts` rejects any case that breaks those rules before it reaches a player.
-- **Plays four suspects who keep their stories straight.** Each suspect has a persona, an alibi and a secret. The culprit lies and gets flustered when pressed on the alibi hole. Innocent suspects dodge, then admit their embarrassing secret.
+- **Plays the suspects, in solo and in rooms, and keeps their stories straight.** Each suspect has a persona, an alibi and a secret. The culprit lies and gets flustered when pressed on the alibi hole. Innocent suspects dodge, then admit their embarrassing secret.
 - **Writes the multiplayer case about the real players**, by name, and makes it a puzzle: at most one clue names the culprit directly; the rest point through details players must match up by talking.
 - **Narrates the ending** in a generated voice, with a different ending depending on whether the room caught the culprit.
 
