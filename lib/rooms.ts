@@ -58,7 +58,7 @@ function cleanSettings(raw: Partial<RoomSettings> | undefined, base?: RoomSettin
     raw?.difficulty === "easy" || raw?.difficulty === "hard" || raw?.difficulty === "medium"
       ? raw.difficulty
       : (base?.difficulty ?? "medium");
-  return { tone, setting, demo: raw?.demo ?? base?.demo ?? false, difficulty, pausedMs: null, fx: null, lastPowers: base?.lastPowers };
+  return { tone, setting, demo: raw?.demo ?? base?.demo ?? false, difficulty, pausedMs: null, fx: null, lastPowers: base?.lastPowers, lastAi: base?.lastAi };
 }
 
 /* ---------------- create / join ---------------- */
@@ -229,7 +229,11 @@ export async function startRoom(
     const cast = players.map((p) => ({ id: p.id, name: p.name }));
     // In a small room any of the suspects can be guilty, including an AI one.
     // Otherwise two friends would always know it is the other one.
-    const humanIds = humans.length >= 4 ? humans.map((p) => p.id) : cast.map((p) => p.id);
+    // A real player is the culprit most of the time (6 in 10), and always in the
+    // round after an AI was. With four or more friends it is always a real player.
+    const botIds = players.filter((p) => p.is_bot).map((p) => p.id);
+    const aiGuilty = humans.length < 4 && botIds.length > 0 && !room.settings.lastAi && Math.random() < 0.4;
+    const humanIds = aiGuilty ? botIds : humans.map((p) => p.id);
     const made = await generateCase({
       setting: merged.setting,
       tone: merged.tone,
@@ -264,7 +268,7 @@ export async function startRoom(
     const t = timings(merged);
     await db.updateRoomIf(code, "generating", {
       status: "briefing",
-      settings: { ...merged, lastPowers },
+      settings: { ...merged, lastPowers, lastAi: botIds.includes(file.culprit_id) },
       case_file: file,
       phase_ends_at: inSeconds(t.briefing),
     });

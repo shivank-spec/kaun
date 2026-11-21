@@ -134,6 +134,8 @@ export type RoomStatus =
   | "reveal";
 
 export interface RoomSettings {
+  /** True when an AI suspect was the culprit last round, so a real player is next. */
+  lastAi?: boolean;
   /** The innocent power each player held last time, so they get a different one. */
   lastPowers?: Record<string, string>;
   setting: string; // "Kolkata" | "This hackathon room" | custom 3 words
