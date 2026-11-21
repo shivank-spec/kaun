@@ -139,7 +139,7 @@ export function Lobby({ room, actions }: Props) {
     setBusy(true);
     setError("");
     try {
-      await actions.start(custom.trim() || setting, tone, difficulty);
+      await actions.start("Anywhere", room.settings.tone, difficulty);
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
@@ -212,16 +212,7 @@ export function Lobby({ room, actions }: Props) {
 
       {host && (
         <div className="mt-3 flex shrink-0 flex-col gap-2">
-          <div className="grid grid-cols-3 gap-1.5">
-            {SETTINGS.map((s) => (
-              <button key={s} type="button" className="chip tap !px-1 !text-[13px]" aria-pressed={!custom.trim() && setting === s} onClick={() => { setSetting(s); setCustom(""); }}>
-                {s === "Kolkata" ? "Kolkata" : "This Room"}
-              </button>
-            ))}
-            <button type="button" className="chip tap !px-1 !text-[13px]" aria-pressed={tone === "noir"} onClick={() => setTone(tone === "desi" ? "noir" : "desi")}>
-              {tone === "desi" ? "Drama" : "Noir"}
-            </button>
-          </div>
+          <p className="label m-0 text-center">Difficulty</p>
           <div className="grid grid-cols-3 gap-1.5">
             {(["easy", "medium", "hard"] as const).map((d) => (
               <button key={d} type="button" className="chip tap !px-1 !text-[13px] capitalize" aria-pressed={difficulty === d} onClick={() => setDifficulty(d)}>
@@ -229,15 +220,6 @@ export function Lobby({ room, actions }: Props) {
               </button>
             ))}
           </div>
-          <input
-            className="field !min-h-11 !text-[14px]"
-            placeholder="Or set it anywhere: our college canteen"
-            value={custom}
-            onChange={(e) => {
-              const w = e.target.value.split(/\s+/).filter(Boolean);
-              setCustom(w.length > 3 ? w.slice(0, 3).join(" ") : e.target.value.slice(0, 36));
-            }}
-          />
         </div>
       )}
 

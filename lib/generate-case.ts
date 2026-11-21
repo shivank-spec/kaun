@@ -108,28 +108,27 @@ export function validateCase(c: CaseFile, mode: "solo" | "room"): string | null 
 /* Prompt building                                                     */
 /* ------------------------------------------------------------------ */
 
-const KOLKATA_SPOTS = [
-  "a five-star hotel on Park Street during a wedding reception",
-  "the tea auction house on N.S. Road, minutes before a record lot goes under the hammer",
-  "a private bank's vault floor in Dalhousie Square after closing time",
-  "a jewellery showroom on Camac Street on the night of a private viewing",
-  "a tech startup's office in Salt Lake Sector V the night before its funding round",
-  "the paintings gallery at Victoria Memorial after the last visitor has left",
-  "the Royal Calcutta Turf Club stables on the morning of the Derby",
-  "the air cargo terminal at Kolkata airport during the night shift",
-  "the media box at Eden Gardens during a sold-out match",
-  "a container yard at Kolkata Port during a customs inspection",
-  "a film set at a Tollygunge studio on the last day of the shoot",
-  "an exam board's strongroom on College Street the night before the papers go out",
+// Places anyone anywhere understands at a glance.
+const PLACES = [
+  "a city museum on the night of a new exhibition",
+  "a five-star hotel during a wedding",
+  "a school on the night before exams",
+  "a bank after closing time",
+  "a jewellery shop during a private viewing",
+  "a tech startup's office the night before a big launch",
+  "an airport cargo area on the night shift",
+  "a film set on the last day of shooting",
+  "a football stadium on match day",
+  "an art auction just before bidding opens",
+  "a hospital pharmacy during the night shift",
+  "a famous restaurant on the night a critic visits",
 ];
 
 function resolveSetting(raw?: string): string {
-  const s = (raw || "Kolkata").trim().slice(0, 60);
-  if (/^kolkata$/i.test(s) || /^calcutta$/i.test(s)) {
-    return KOLKATA_SPOTS[Math.floor(Math.random() * KOLKATA_SPOTS.length)];
-  }
-  if (/hackathon/i.test(s)) {
-    return "the Vibe Coders Hackathon floor at AIC Techno, Kolkata, run by Calcutta AI Club, in the last hour before submissions close (laptops, the judges' desk and score sheets, the prize cheque, the Wi-Fi rack, a sponsor's prototype on display)";
+  const s = (raw || "").trim().slice(0, 60);
+  // The game no longer asks players where to set the case: pick a place for them.
+  if (!s || /^(kolkata|calcutta|anywhere)$/i.test(s) || /hackathon/i.test(s)) {
+    return PLACES[Math.floor(Math.random() * PLACES.length)];
   }
   return s;
 }
@@ -142,10 +141,10 @@ const toneGuide = (tone: Tone) =>
 const COMMON_RULES = `
 RULES
 - REALISM: this must read like a real case file, not a joke. Choose a serious, high-stakes, non-violent crime: a jewel or art theft, a swapped forgery, a leaked exam paper or tender bid, stolen source code or client data, a wiped server, embezzlement, a sabotaged machine or race, a doctored document, blackmail, an inside job. Never a stolen snack or sweet. Nobody is hurt or killed.
-- Give it real-world texture: exact clock times, a rupee value or what is at stake, named rooms, and everyday evidence anyone understands (a camera recording, a door-card swipe, a phone call, a fingerprint, a receipt, a muddy footprint, a witness).
-- Suspects are believable adults with real jobs and real motives (debt, a passed-over promotion, a rival's offer, a cover-up). Titles are short and sound like a case file. Vary them: do not always use the word "Heist" (e.g. "The Camac Street Switch", "Lot 47", "Night Shift at Gate 3").
+- Give it just enough real-world texture: what is at stake, the room it happened in, and everyday evidence anyone understands (a camera recording, a door-card swipe, a phone call, a fingerprint, a receipt, a muddy footprint, a witness).
+- Suspects are believable adults with real jobs and real motives (debt, a passed-over promotion, a rival's offer, a cover-up). Titles are 2-4 words and sound like a case file. Vary them: do not always use the word "Heist" (e.g. "The Missing Painting", "Lot 47", "Night Shift at Gate 3").
 - "facts" states the case in three short plain lines a child could follow: "what" was taken or done (under 10 words), "when" (a time window), "where" (the exact spot).
-- CLARITY: one crime, one moment, one place. Every clue is a single plain sentence under 18 words. No jargon.
+- SIMPLE: one thing taken or done, one room, one moment. Do not name a city or real street. Use at most ONE clock time per sentence. Every alibi is under 12 words. Every clue is one sentence under 15 words. A newcomer must understand the whole case in 20 seconds.
 - Decide the culprit, motive, method and timeline FIRST. Then write everything else to be consistent with them.
 - "crime_verb" finishes the sentence "Find who ..." in under 8 words, e.g. "swapped the necklace for a fake".
 - "alibi_hole" is the one concrete, checkable fact that breaks the culprit's public_alibi.
@@ -195,7 +194,7 @@ Return ONE JSON object with exactly these keys:
  "clues":[{"id":"c1","text","held_by","points_to","is_red_herring"} x5 with ids c1..c5],
  "alibi_hole","culprit_objective","ending_caught","ending_escaped","roast"}
 ${COMMON_RULES}
-- Exactly 4 suspects with realistic Indian (mostly Bengali/Kolkata) names, distinct jobs and distinct ways of speaking.
+- Exactly 4 suspects with simple, obvious jobs (guard, manager, cleaner, chef, curator, intern) and distinct ways of speaking.
 - Exactly 5 clues: 3 TRUE (is_red_herring=false) and 2 RED HERRINGS (is_red_herring=true).
 - Each TRUE clue: points_to = culprit_id, and held_by = a DIFFERENT innocent suspect (it is something that suspect saw or knows). The three together prove the culprit.
 - Each RED HERRING: points_to an innocent suspect, held_by a different suspect, and is fully explained by the accused suspect's innocent_secret.

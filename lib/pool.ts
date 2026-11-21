@@ -9,10 +9,10 @@ import type { CaseFile, Tone } from "./types";
 export type Bucket = "kolkata" | "hackathon";
 
 export function bucketOf(setting?: string): Bucket | null {
-  const s = (setting || "Kolkata").trim();
-  if (/^(kolkata|calcutta)$/i.test(s)) return "kolkata";
-  if (/hackathon/i.test(s)) return "hackathon";
-  return null; // custom settings are always written live
+  const s = (setting || "").trim();
+  // Players no longer pick a place, so nearly every case goes in one bank.
+  if (!s || /^(kolkata|calcutta|anywhere)$/i.test(s) || /hackathon/i.test(s)) return "kolkata";
+  return null; // a custom setting is always written live
 }
 
 export async function bankCase(bucket: Bucket, tone: Tone, file: CaseFile) {

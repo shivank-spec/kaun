@@ -38,9 +38,6 @@ export default function Home() {
     if (saved) {
       try {
         const p = JSON.parse(saved);
-        if (p.settingId) setSettingId(p.settingId);
-        if (p.custom) setCustom(p.custom);
-        if (p.tone) setTone(p.tone);
         // New players stay on Easy for their first three rounds.
         if (p.difficulty && roundsPlayed() >= 3) setDifficulty(p.difficulty);
       } catch {}
@@ -65,8 +62,7 @@ export default function Home() {
     localStorage.setItem("kaun.prefs", JSON.stringify({ settingId, custom, tone, difficulty }));
   }, [settingId, custom, tone, difficulty]);
 
-  const setting =
-    settingId === "custom" ? custom.trim() || "Kolkata" : SETTINGS.find((s) => s.id === settingId)!.value;
+  const setting = "Anywhere"; // the game picks the place
 
   function typeCell(i: number, raw: string) {
     const letters = raw.replace(/[^a-zA-Z]/g, "").toUpperCase();
@@ -225,6 +221,7 @@ export default function Home() {
           {status}
         </p>
 
+        <p className="label m-0 -mb-1 text-center">Difficulty</p>
         <div role="group" aria-label="Difficulty" className="grid grid-cols-3 gap-1.5">
           {(["easy", "medium", "hard"] as const).map((d) => (
             <button
@@ -242,74 +239,9 @@ export default function Home() {
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <button type="button" className="btn btn-glass tap !min-h-12 !rounded-full !text-[15px] !font-medium" onClick={() => setSheet("settings")}>
-            <Gear size={18} />
-            {SETTINGS.find((s) => s.id === settingId)!.label === "Custom" ? custom.trim() || "Custom" : SETTINGS.find((s) => s.id === settingId)!.label}
-          </button>
-          <button
-            type="button"
-            className="btn btn-glass tap !min-h-12 !rounded-full !text-[15px] !font-medium"
-            aria-label={`Narrator: ${tone === "desi" ? "Drama" : "Noir"}. Tap to switch.`}
-            onClick={() => {
-              sfx.tap();
-              setTone(tone === "desi" ? "noir" : "desi");
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M4 9.5v5h3.5L12 18V6L7.500 9.500zM15.500 9a4 4 0 0 1 0 6M18 6.500a7.500 7.500 0 0 1 0 11" />
-            </svg>
-            {tone === "desi" ? "Drama" : "Noir"}
-          </button>
-        </div>
       </div>
 
       <HowTo mode="solo" open={help} onClose={() => setHelp(false)} />
-
-      {sheet === "settings" && (
-        <div className="scrim" role="dialog" aria-label="Settings">
-          <button type="button" aria-label="Close" className="flex-1 border-0 bg-transparent" onClick={() => setSheet(null)} />
-          <div className="sheet flex flex-col gap-4 p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
-            <span className="display text-[24px]">Settings</span>
-            <div className="flex flex-col gap-2">
-              <span className="eyebrow">Where it happens</span>
-              <div className="grid grid-cols-3 gap-1.5">
-                {SETTINGS.map((s) => (
-                  <button key={s.id} type="button" className="chip tap" aria-pressed={settingId === s.id} onClick={() => setSettingId(s.id)}>
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-              {settingId === "custom" && (
-                <input
-                  autoFocus
-                  className="field"
-                  placeholder="Up to 3 words: our college canteen"
-                  value={custom}
-                  onChange={(e) => {
-                    const w = e.target.value.split(/\s+/).filter(Boolean);
-                    setCustom(w.length > 3 ? w.slice(0, 3).join(" ") : e.target.value.slice(0, 36));
-                  }}
-                />
-              )}
-            </div>
-            <div className="flex flex-col gap-2">
-              <span className="eyebrow">Narrator</span>
-              <div className="grid grid-cols-2 gap-1.5">
-                <button type="button" className="chip tap" aria-pressed={tone === "desi"} onClick={() => setTone("desi")}>
-                  Drama
-                </button>
-                <button type="button" className="chip tap" aria-pressed={tone === "noir"} onClick={() => setTone("noir")}>
-                  Noir
-                </button>
-              </div>
-            </div>
-            <button type="button" className="btn btn-primary tap" onClick={() => setSheet(null)}>
-              Done
-            </button>
-          </div>
-        </div>
-      )}
 
       {sheet === "name" && (
         <div className="scrim" role="dialog" aria-label="Your name">
