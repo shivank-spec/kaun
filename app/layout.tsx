@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://playalibi.vercel.app"),
   title: "Alibi: find the culprit, hide your role",
   description:
-    "A 3-minute AI mystery game set in Kolkata. Interrogate the suspects alone, or accuse your friends.",
+    "A 3-minute AI mystery game. Interrogate the suspects alone, or accuse your friends.",
   openGraph: {
     title: "Alibi",
     description: "Find the culprit. Hide your role. A new mystery every 3 minutes.",

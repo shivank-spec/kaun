@@ -189,7 +189,9 @@ export async function startRoom(
       players.push(bot);
     }
     const cast = players.map((p) => ({ id: p.id, name: p.name }));
-    const humanIds = humans.map((p) => p.id);
+    // In a small room any of the suspects can be guilty, including an AI one.
+    // Otherwise two friends would always know it is the other one.
+    const humanIds = humans.length >= 4 ? humans.map((p) => p.id) : cast.map((p) => p.id);
     const made = await generateCase({
       setting: merged.setting,
       tone: merged.tone,
@@ -306,19 +308,29 @@ export async function askSuspect(codeRaw: string, playerId: string, targetId: st
   const who = file.suspects.find((x) => x.id === target.id);
   if (!who) return { reply: "I have nothing to add." };
   const saw = (who.private_clues ?? []).join(" / ");
+  const guilty = who.id === file.culprit_id;
+  const brief = guilty
+    ? `You are GUILTY: you ${file.crime_verb}. Nobody knows yet and you must not get caught.
+CASE: ${file.title}. ${file.crime}
+Your cover story (stick to it): ${who.public_alibi}
+The weak spot in your story: ${file.alibi_hole}
+Your goal: ${file.culprit_objective}
+Personality: ${who.persona}. You speak like this: ${who.speaking_style}.
+Answer in 1-2 short, vivid sentences, in character, plain English, no jargon. Lie smoothly and point the finger at someone else. If the question touches the weak spot, get flustered: dodge, contradict yourself slightly, or change the subject. NEVER confess.`
+    : `You are INNOCENT, but nervous.
+CASE: ${file.title}. ${file.crime}
+Your story: ${who.public_alibi}
+Something private you would rather hide (not a crime): ${who.innocent_secret}
+What you noticed that night: ${saw || "nothing unusual"}
+Personality: ${who.persona}. You speak like this: ${who.speaking_style}.
+Answer the question in 1-2 short, vivid sentences, in character, plain English, no jargon. If asked what you saw or who you suspect, share what you noticed. Never name the culprit as a fact; you only know what you saw.`;
   try {
     const raw = (await chatJSON({
       kind: "chat",
       temperature: 0.95,
       maxTokens: 400,
       groqTimeoutMs: 6000,
-      system: `You are ${who.name}, ${who.role}, a suspect being questioned in a tense crime drama. You are INNOCENT, but nervous.
-CASE: ${file.title}. ${file.crime}
-Your story: ${who.public_alibi}
-Something private you would rather hide (not a crime): ${who.innocent_secret}
-What you noticed that night: ${saw || "nothing unusual"}
-Personality: ${who.persona}. You speak like this: ${who.speaking_style}.
-Answer the question in 1-2 short, vivid sentences, in character, plain English, no jargon. If asked what you saw or who you suspect, share what you noticed. Never name the culprit as a fact; you only know what you saw.
+      system: `You are ${who.name}, ${who.role}, a suspect being questioned in a tense crime drama. ${brief}
 Return ONLY JSON: {"reply": string}`,
       user: `${me.name} asks you: ${question}`,
     })) as { reply?: unknown };
@@ -327,6 +339,7 @@ Return ONLY JSON: {"reply": string}`,
   } catch {
     // fall through to a line built from the case facts
   }
+  if (guilty) return { reply: `${who.public_alibi}. Why are you asking me? Ask the others where they were.` };
   return { reply: saw ? `${who.public_alibi}. But I will tell you this: ${(who.private_clues ?? [])[0]}` : `${who.public_alibi}. That is all I know.` };
 }
 
@@ -516,7 +529,12 @@ async function advance(room: RoomRow, players: PlayerRow[]): Promise<RoomRow> {
       patch: { status: "reveal", phase_ends_at: null, reveal: buildReveal(room.case_file, players, room.settings.fx) },
     };
   }
-  if (!next) return room;
+  if (!next) {
+    if (room.status === "discuss" && (await botTricks(room, players, t.discuss))) {
+      return (await db.getRoom(room.code)) ?? room;
+    }
+    return room;
+  }
   const moved = await db.updateRoomIf(room.code, next.expected, next.patch);
   if (moved && next.patch.status === "vote" && room.case_file) {
     // Bots vote the moment voting opens: right about half the time.
@@ -526,13 +544,45 @@ async function advance(room: RoomRow, players: PlayerRow[]): Promise<RoomRow> {
         .filter((p) => p.is_bot && !p.vote)
         .map((bot) => {
           const others = players.filter((p) => p.id !== bot.id);
-          const guess =
-            Math.random() < 0.5 ? culprit : others[crypto.randomInt(others.length)].id;
+          const framed = room.settings.fx?.planted.find((x) => x.byId === bot.id)?.targetId;
+          const random = others[crypto.randomInt(others.length)].id;
+          const guess = bot.id === culprit ? (framed ?? random) : Math.random() < 0.5 ? culprit : random;
           return db.updatePlayer(bot.id, { vote: guess });
         }),
     );
   }
   return (await db.getRoom(room.code)) ?? room;
+}
+
+/**
+ * A guilty AI suspect fights back: it plants fake evidence against a real
+ * player early on, then cuts the lights later. Both choices are fixed by the
+ * room code, so two polls landing together write the same thing.
+ */
+async function botTricks(room: RoomRow, players: PlayerRow[], discussSec: number): Promise<boolean> {
+  const file = room.case_file;
+  if (!file || !room.phase_ends_at) return false;
+  const bot = players.find((p) => p.id === file.culprit_id && p.is_bot);
+  const humans = players.filter((p) => !p.is_bot).sort((a, b) => a.id.localeCompare(b.id));
+  if (!bot || !humans.length) return false;
+  const done = 1 - (Date.parse(room.phase_ends_at) - Date.now()) / (discussSec * 1000);
+  const fx = room.settings.fx ?? { planted: [], detectors: [] };
+  const seed = room.code.charCodeAt(0) + room.code.charCodeAt(room.code.length - 1);
+  const save = (next: NonNullable<RoomSettings["fx"]>) =>
+    store().updateRoomIf(room.code, "discuss", { settings: { ...room.settings, fx: next } });
+  const plantId = `bot-${bot.id}`;
+  if (done >= 0.3 && !fx.planted.some((p) => p.id === plantId)) {
+    const target = humans[seed % humans.length];
+    const where = (file.facts?.where ?? "the room").replace(/\.$/, "");
+    const text = PLANT_LINES[seed % PLANT_LINES.length](target.name.split(" ")[0], where);
+    await save({ ...fx, planted: [...fx.planted, { id: plantId, text, byId: bot.id, targetId: target.id, at: new Date().toISOString() }] });
+    return true;
+  }
+  if (done >= 0.6 && !fx.blackoutBy) {
+    await save({ ...fx, blackoutUntil: inSeconds(BLACKOUT_SECONDS), blackoutBy: bot.id });
+    return true;
+  }
+  return false;
 }
 
 /** A question fired at this player stays on their screen for a few seconds. */

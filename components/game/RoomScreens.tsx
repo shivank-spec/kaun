@@ -597,7 +597,7 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
         </div>
       )}
       <div className="mt-3 flex items-start justify-between gap-3">
-        <p className="m-0 text-[15px] leading-snug text-[#E3E8F2]">One of you did it. Open a suspect and question them.</p>
+        <p className="m-0 text-[15px] leading-snug text-[#E3E8F2]">Anyone here could be guilty, even an AI suspect. Open one and question them.</p>
         <span className="label shrink-0 rounded-full px-2.5 py-1.5 text-snow" style={{ boxShadow: "inset 0 0 0 1px rgba(95,221,247,.5)" }}>
           {asksLeft} {asksLeft === 1 ? "question" : "questions"} left
         </span>
