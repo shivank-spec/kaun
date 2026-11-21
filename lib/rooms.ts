@@ -265,11 +265,18 @@ export async function warmNarration(codeRaw: string, playerId: string) {
   const players = await db.listPlayers(code);
   if (!players.some((p) => p.id === playerId)) throw new GameError("You are not in this room", 403);
   const noir = room.settings.tone === "noir";
-  await Promise.allSettled([
-    narrate(narrationOf(room.case_file, true), noir),
-    narrate(narrationOf(room.case_file, false), noir),
-  ]);
-  return { ok: true };
+  // One at a time: the voice model rejects parallel requests. Retry once if busy.
+  let ready = 0;
+  for (const caught of [true, false]) {
+    const text = narrationOf(room.case_file, caught);
+    let out = await narrate(text, noir);
+    if (!out) {
+      await new Promise((r) => setTimeout(r, 4000));
+      out = await narrate(text, noir);
+    }
+    if (out) ready++;
+  }
+  return { ok: true, ready };
 }
 
 export async function playAgain(codeRaw: string, playerId: string) {
