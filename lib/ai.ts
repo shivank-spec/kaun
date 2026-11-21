@@ -53,6 +53,8 @@ async function callJSON(
       model,
       // These models think before answering; keep that short so we stay fast.
       ...(groqModel ? ({ reasoning_effort: "low" } as object) : {}),
+      // Gemini 2.5 Flash thinks by default, which is too slow for a party game.
+      ...(model === GEMINI_FLASH ? ({ reasoning_effort: "none" } as object) : {}),
       temperature: c.temperature ?? 0.9,
       max_tokens: c.maxTokens ?? 1800,
       response_format: { type: "json_object" },
@@ -90,9 +92,9 @@ function providers(kind: "case" | "chat"): Provider[] {
     kind === "case"
       ? [
           g && viaGroq(BIG),
-          m && viaGemini(GEMINI_FLASH, 12000),
+          m && viaGemini(GEMINI_FLASH, 7000),
           g && viaGroq(ALT),
-          m && viaGemini(GEMINI_LITE, 12000),
+          m && viaGemini(GEMINI_LITE, 6000),
           g && viaGroq(SMALL),
         ]
       : [

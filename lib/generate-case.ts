@@ -301,15 +301,23 @@ export async function generateCase(
   return result;
 }
 
+const CASE_BUDGET_MS = 13000; // a party cannot stare at a spinner for longer
+
 async function attempt(
   mode: "solo" | "room",
   prompt: { system: string; user: string },
   players?: { id: string; name: string }[],
   culpritAmong?: string[],
 ): Promise<{ file: CaseFile; source: "ai" | "fallback" }> {
+  const started = Date.now();
   for (let n = 0; n < 2; n++) {
+    const left = CASE_BUDGET_MS - (Date.now() - started);
+    if (left < 2500) break;
     try {
-      const raw = await chatJSON({ ...prompt, temperature: 0.95, maxTokens: 3500, groqTimeoutMs: 12000 });
+      const raw = await Promise.race([
+        chatJSON({ ...prompt, temperature: 0.95, maxTokens: 3500, groqTimeoutMs: Math.min(9000, left) }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("case budget exceeded")), left)),
+      ]);
       return { file: parse(raw, mode, players, culpritAmong), source: "ai" };
     } catch (e) {
       console.warn(`[case] attempt ${n + 1} failed:`, (e as Error).message);
