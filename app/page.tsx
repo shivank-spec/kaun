@@ -47,7 +47,7 @@ export default function Home() {
       const sess = JSON.parse(localStorage.getItem("kaun.session") || "null");
       // Only offer a way back into a round that is still going and that this
       // phone was in within the last ten minutes. Anything older is forgotten.
-      const recent = typeof sess?.at === "number" && Date.now() - sess.at < 10 * 60 * 1000;
+      const recent = Date.now() - Number(localStorage.getItem("kaun.active") || 0) < 10 * 60 * 1000;
       if (sess?.code && sess?.playerId && recent) {
         fetch(`/api/room/${sess.code}?playerId=${sess.playerId}`, { cache: "no-store" })
           .then((r) => (r.ok ? r.json() : null))
@@ -108,8 +108,9 @@ export default function Home() {
       localStorage.setItem("kaun.name", name.trim());
       localStorage.setItem(
         "kaun.session",
-        JSON.stringify({ code: data.code, playerId: data.playerId, name: name.trim(), at: Date.now() }),
+        JSON.stringify({ code: data.code, playerId: data.playerId, name: name.trim() }),
       );
+      localStorage.setItem("kaun.active", String(Date.now()));
       // A full page load is more dependable than a client-side route change here.
       window.location.assign(`/room/${data.code}`);
     } catch (e) {

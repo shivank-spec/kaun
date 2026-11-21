@@ -70,16 +70,17 @@ function Room({ code }: { code: string }) {
 
   // While this phone is in the room, keep its seat marked as recent.
   useEffect(() => {
-    if (!mine) return;
+    if (!mine?.playerId) return;
+    // Its own key, so updating it never changes the session React is watching.
     const touch = () => {
       try {
-        localStorage.setItem("kaun.session", JSON.stringify({ ...mine, at: Date.now() }));
+        localStorage.setItem("kaun.active", String(Date.now()));
       } catch {}
     };
     touch();
     const t = setInterval(touch, 60000);
     return () => clearInterval(t);
-  }, [mine]);
+  }, [mine?.playerId]);
 
   // Keep the phone awake during a round.
   useEffect(() => {
