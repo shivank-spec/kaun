@@ -59,6 +59,26 @@ function Room({ code }: { code: string }) {
     };
   }, [code, mine?.playerId, refresh, router, clear]);
 
+  // On a laptop, the side panel swaps the QR code for the crime scene once a case is on.
+  const sceneTitle = room?.case?.title;
+  const sceneOn = status === "briefing" || status === "discuss" || status === "vote";
+  useEffect(() => {
+    const detail =
+      sceneOn && room?.case
+        ? {
+            title: room.case.title,
+            what: room.case.facts?.what ?? room.case.crime,
+            when: room.case.facts?.when ?? "",
+            where: room.case.facts?.where ?? room.case.setting,
+            suspects: room.players.filter((p) => p.id !== room.you?.id).map((p) => p.name.split(" ")[0]),
+          }
+        : null;
+    window.dispatchEvent(new CustomEvent("alibi:scene", { detail }));
+    return () => {
+      window.dispatchEvent(new CustomEvent("alibi:scene", { detail: null }));
+    };
+  }, [sceneOn, sceneTitle]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Sound: a tick for the last ten seconds of talking, a sting on the reveal.
   useEffect(() => {
     if (status === "discuss" && !room?.paused && secondsLeft != null && secondsLeft > 0 && secondsLeft <= 10) sfx.tick(secondsLeft <= 5);

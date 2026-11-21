@@ -10,10 +10,18 @@ import { useEffect, useState } from "react";
  * left, and a QR code to carry on from your phone on the right.
  * Hidden below 1100px, so phones and tablets never see them.
  */
+type Scene = { title: string; what: string; when: string; where: string; suspects: string[] };
+
 export function DesktopFrame() {
   const path = usePathname();
   const [url, setUrl] = useState("");
   useEffect(() => setUrl(window.location.origin + path), [path]);
+  const [scene, setScene] = useState<Scene | null>(null);
+  useEffect(() => {
+    const on = (e: Event) => setScene((e as CustomEvent<Scene | null>).detail ?? null);
+    window.addEventListener("alibi:scene", on);
+    return () => window.removeEventListener("alibi:scene", on);
+  }, []);
   const room = /^\/room\/([A-Za-z]{4})/.exec(path)?.[1]?.toUpperCase();
 
   return (
@@ -46,6 +54,35 @@ export function DesktopFrame() {
       </aside>
 
       <aside className="side side-right">
+        {scene ? (
+          <div className="panel rise w-[290px] overflow-hidden p-0">
+            <div
+              className="flex h-[150px] items-end p-4"
+              style={{ background: "linear-gradient(180deg, rgba(6,10,20,.15), rgba(6,10,20,.92)), url(/art/scene.jpg) center/cover" }}
+            >
+              <div>
+                <p className="eyebrow m-0">The crime scene</p>
+                <p className="display m-0 mt-1 text-[22px] leading-tight">{scene.where}</p>
+              </div>
+            </div>
+            <div className="flex flex-col gap-3 p-4">
+              <div>
+                <p className="label m-0 text-cyan">What happened</p>
+                <p className="m-0 mt-0.5 text-[14.5px] leading-snug">{scene.what}</p>
+              </div>
+              {scene.when && (
+                <div>
+                  <p className="label m-0 text-cyan">When</p>
+                  <p className="m-0 mt-0.5 text-[14.5px] leading-snug">{scene.when}</p>
+                </div>
+              )}
+              <div>
+                <p className="label m-0 text-cyan">Who was there</p>
+                <p className="m-0 mt-0.5 text-[14.5px] leading-snug">You, {scene.suspects.join(", ")}</p>
+              </div>
+            </div>
+          </div>
+        ) : (
         <div className="panel flex w-[250px] flex-col items-center gap-3 p-5 text-center">
           <p className="eyebrow m-0">{room ? `Room ${room}` : "Better on a phone"}</p>
           <span className="rounded-[12px] bg-white p-3">{url && <QRCodeSVG value={url} size={170} />}</span>
@@ -53,6 +90,7 @@ export function DesktopFrame() {
             {room ? "Friends scan this to join the room." : "Scan to open this on your phone."}
           </p>
         </div>
+        )}
         <p className="label mt-5 max-w-[250px] text-center">No sign-up · works on any phone, tablet or laptop</p>
       </aside>
     </>

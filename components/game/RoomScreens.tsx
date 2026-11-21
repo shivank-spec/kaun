@@ -304,7 +304,7 @@ function RoleCard({ card, compact = false }: { card: PlayerCard; compact?: boole
         {card.objective && <Line k="The lie you need them to believe" v={card.objective} color="#ff8098" />}
         {card.partner && <Line k="Your secret accomplice" v={`${card.partner} knows you did it and will help you. Work together.`} color="#ff8098" />}
         {card.role === "culprit" ? (
-          <Line k="Your secret powers · once each" v="Plant fake evidence against someone. Cut the lights for 10 seconds." color="#ff8098" />
+          <Line k="Your secret powers · once each" v="Plant fake evidence against someone. Cut the lights to destroy one piece of evidence." color="#ff8098" />
         ) : (
           <Line
             k="Your secret power · once"
@@ -312,7 +312,7 @@ function RoleCard({ card, compact = false }: { card: PlayerCard; compact?: boole
               card.powers?.clear
                 ? "Background check: confirm one suspect who is innocent."
                 : card.powers?.extra
-                  ? "Extra questions: ask three more questions."
+                  ? "Double vote: make your vote count twice."
                   : "Lie detector: test one piece of evidence to see if it was planted."
             }
             color={color}
@@ -544,7 +544,6 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
         setCleared(r.clearedName ?? null);
         sfx.clue();
       } else if (kind === "extra") {
-        setAsksLeft((n) => n + (r.extra ?? 3));
         sfx.clue();
         setOpen(null);
       } else {
@@ -800,10 +799,10 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
                 )}
                 {powers.extra && (
                   <>
-                    <p className="display m-0 mt-2 text-[22px]">Extra questions</p>
-                    <p className="m-0 mt-1 text-[14px] leading-snug text-mist">Get three more questions to ask the suspects.</p>
+                    <p className="display m-0 mt-2 text-[22px]">Double vote</p>
+                    <p className="m-0 mt-1 text-[14px] leading-snug text-mist">Your vote counts twice when the room decides. Use it when you are sure who did it.</p>
                     <button type="button" className="btn btn-primary tap mt-3 !min-h-12" disabled={powerBusy} onClick={() => power("extra")}>
-                      Give me 3 more
+                      Arm my double vote
                     </button>
                   </>
                 )}
@@ -823,7 +822,7 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
                 {powers.blackout && (
                   <>
                     <p className="display m-0 mt-5 text-[22px]">Cut the lights</p>
-                    <p className="m-0 mt-1 text-[14px] leading-snug text-mist">Every phone goes dark for 10 seconds, yours too. Use it when they are getting close.</p>
+                    <p className="m-0 mt-1 text-[14px] leading-snug text-mist">Every phone goes dark for 10 seconds, and one piece of evidence is destroyed for good. Use it when they are getting close.</p>
                     <button type="button" className="btn btn-danger tap mt-2.5 !min-h-12" disabled={powerBusy} onClick={() => power("blackout")}>
                       Cut the lights now
                     </button>

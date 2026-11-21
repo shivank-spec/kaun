@@ -150,6 +150,8 @@ export interface RoomSettings {
     blackoutUntil?: string | null;
     blackoutBy?: string | null;
     detectors: string[]; // players who used their lie detector
+    destroyed?: number | null; // which piece of evidence vanished in the blackout
+    double?: string[]; // players whose vote counts twice
     notes?: string[]; // other powers used, as ready-made lines for the end screen
   } | null;
 }

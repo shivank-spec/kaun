@@ -29,11 +29,11 @@ export class GameError extends Error {
 
 const SECONDS = {
   // Briefing is long enough to read the case and your own card properly.
-  normal: { briefing: 45, discuss: 100, vote: 30 },
+  normal: { briefing: 60, discuss: 150, vote: 40 },
   demo: { briefing: 15, discuss: 45, vote: 20 },
 };
-// Harder rooms get less time to argue. Every level still fits in three minutes.
-const DISCUSS_BY_LEVEL = { easy: 105, medium: 100, hard: 75 } as const;
+// Harder rooms get less time to argue. The host can end any phase early.
+const DISCUSS_BY_LEVEL = { easy: 180, medium: 150, hard: 110 } as const;
 function timings(settings: RoomSettings) {
   if (settings.demo) return SECONDS.demo;
   return { ...SECONDS.normal, discuss: DISCUSS_BY_LEVEL[settings.difficulty ?? "medium"] };
@@ -314,11 +314,11 @@ function buildReveal(file: CaseFile, players: PlayerRow[], fx?: RoomSettings["fx
   const helper = players.find((p) => p.card?.accompliceOf);
   if (helper) tricks.push(`${helper.name} was the secret accomplice`);
   for (const p of fx?.planted ?? []) tricks.push(`${nameOf(p.byId)} planted fake evidence against ${nameOf(p.targetId)}`);
-  if (fx?.blackoutBy) tricks.push(`${nameOf(fx.blackoutBy)} cut the lights`);
+  if (fx?.blackoutBy) tricks.push(`${nameOf(fx.blackoutBy)} cut the lights and destroyed evidence`);
   for (const id of fx?.detectors ?? []) tricks.push(`${nameOf(id)} used a lie detector`);
   for (const note of fx?.notes ?? []) tricks.push(note);
   const tally = new Map<string, number>();
-  for (const p of players) if (p.vote) tally.set(p.vote, (tally.get(p.vote) ?? 0) + 1);
+  for (const p of players) if (p.vote) tally.set(p.vote, (tally.get(p.vote) ?? 0) + (fx?.double?.includes(p.id) ? 2 : 1));
   const ranked = [...tally.entries()].sort((a, b) => b[1] - a[1]);
   // A tie means the group could not agree, so nobody is caught.
   const accusedId = ranked.length && (ranked.length === 1 || ranked[0][1] > ranked[1][1]) ? ranked[0][0] : null;
@@ -476,7 +476,7 @@ export async function playPower(
 
   if (power === "blackout") {
     if (me.card.role !== "culprit" || !powers.blackout) throw new GameError("You cannot do that");
-    await saveFx({ ...fx, blackoutUntil: inSeconds(BLACKOUT_SECONDS), blackoutBy: me.id });
+    await saveFx({ ...fx, blackoutUntil: inSeconds(BLACKOUT_SECONDS), blackoutBy: me.id, destroyed: crypto.randomInt(2) });
     await spend("blackout");
     return { ok: true };
   }
@@ -502,9 +502,10 @@ export async function playPower(
 
   if (power === "extra") {
     if (me.card.role !== "innocent" || !powers.extra) throw new GameError("You have already used it");
-    await saveFx({ ...fx, notes: [...(fx.notes ?? []), `${me.name} took extra questions`] });
+    // Double vote: this player's vote counts twice when the room decides.
+    await saveFx({ ...fx, double: [...(fx.double ?? []), me.id], notes: [...(fx.notes ?? []), `${me.name} used a double vote`] });
     await spend("extra");
-    return { ok: true, extra: 3 };
+    return { ok: true };
   }
 
   throw new GameError("Unknown power");
@@ -683,7 +684,7 @@ async function botTricks(room: RoomRow, players: PlayerRow[], discussSec: number
     return true;
   }
   if (done >= 0.6 && !fx.blackoutBy) {
-    await save({ ...fx, blackoutUntil: inSeconds(BLACKOUT_SECONDS), blackoutBy: bot.id });
+    await save({ ...fx, blackoutUntil: inSeconds(BLACKOUT_SECONDS), blackoutBy: bot.id, destroyed: seed % 2 });
     return true;
   }
   return false;
@@ -750,7 +751,11 @@ export async function getRoomView(codeRaw: string, playerId: string | null): Pro
   const fxNow = room.settings.fx ?? null;
   const planted = room.status === "lobby" || room.status === "generating" ? [] : (fxNow?.planted ?? []);
   const feed = [
-    ...evidence.slice(0, dropped).map((e, i) => ({ id: `e${i}`, ...e })),
+    ...evidence.slice(0, dropped).map((e, i) =>
+      fxNow?.destroyed === i
+        ? { id: `x${i}`, from: "nobody", text: "DESTROYED. This evidence vanished while the lights were out." }
+        : { id: `e${i}`, ...e },
+    ),
     ...planted.map((p) => ({ id: p.id, from: "an anonymous tip", text: p.text })),
   ];
   const doubtOf = (id: string) => {
