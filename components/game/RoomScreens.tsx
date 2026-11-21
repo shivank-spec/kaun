@@ -243,6 +243,29 @@ export function Lobby({ room, actions }: Props) {
   );
 }
 
+/** Everyone's public story: who they are in the case and where they say they were. */
+function Stories({ room }: { room: RoomView }) {
+  const withStory = room.players.filter((p) => p.caseRole || p.alibi);
+  if (!withStory.length) return null;
+  return (
+    <div>
+      <p className="label m-0 text-snow">Everyone&apos;s story</p>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        {room.players.map((p, i) => (
+          <div key={p.id} className="panel px-3 py-2.5" style={{ borderLeft: `3px solid ${ringOf(i)}` }}>
+            <span className="block truncate text-[14px] font-semibold leading-tight">
+              {first(p.name)}
+              {p.id === room.you?.id ? " (you)" : ""}
+            </span>
+            <span className="block truncate text-[12px] text-mist">{p.caseRole ?? (p.isBot ? "AI bot" : "Suspect")}</span>
+            {p.alibi && <span className="mt-1 line-clamp-3 block text-[12px] leading-snug text-fog">“{p.alibi}”</span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- briefing: hold to reveal your secret role ---------------- */
 
 function RoleCard({ card, compact = false }: { card: PlayerCard; compact?: boolean }) {
@@ -344,8 +367,11 @@ export function Briefing({ room, secondsLeft }: Props) {
           <p className="label mt-2">Press and hold the scanner</p>
         </div>
       ) : (
-        <div className="rise flex flex-1 flex-col justify-center gap-3 py-3">
-          <RoleCard card={card} />
+        <div className="rise mt-3 flex min-h-0 flex-1 flex-col gap-3">
+          <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto">
+            <RoleCard card={card} />
+            <Stories room={room} />
+          </div>
           <button type="button" className="btn btn-glass tap" onClick={() => { setShown(false); setHold(0); }}>
             Hide my role
           </button>
@@ -434,6 +460,7 @@ export function Discuss({ room, actions, secondsLeft }: Props) {
             Argue it out. Tap a player above to mark who you doubt. Voting opens when the clock hits zero.
           </p>
         </div>
+        <Stories room={room} />
       </div>
 
       <button type="button" className="btn btn-glass tap mt-3" onClick={() => setHidden((h) => !h)}>
@@ -490,7 +517,7 @@ export function Vote({ room, actions, secondsLeft }: Props) {
         <Timer seconds={secondsLeft ?? 0} total={total} label="Voting phase" sub={`${votesIn} / ${room.players.length} votes in`} />
       </div>
 
-      <div className="mt-3 grid flex-1 grid-cols-2 content-start gap-2.5 overflow-y-auto">
+      <div className="mt-3 grid min-h-[240px] flex-1 auto-rows-fr grid-cols-2 gap-2.5 overflow-y-auto">
         {room.players.map((p, i) => {
           const mine = p.id === you?.id;
           const on = (you?.votedFor ?? pick) === p.id;
@@ -504,7 +531,7 @@ export function Vote({ room, actions, secondsLeft }: Props) {
                 sfx.tap();
                 setPick(p.id);
               }}
-              className="tap flex flex-col items-center gap-1 rounded-[14px] border-0 px-2 pb-2.5 pt-3.5 text-snow disabled:!opacity-100"
+              className="tap flex flex-col items-center justify-center gap-1 rounded-[14px] border-0 px-2 pb-2.5 pt-3.5 text-snow disabled:!opacity-100"
               style={{
                 background: on ? "linear-gradient(180deg, rgba(240,56,90,.28), rgba(40,10,22,.9))" : "linear-gradient(180deg, rgba(28,40,66,.86), rgba(12,18,34,.9))",
                 boxShadow: on ? "inset 0 0 0 1.5px #F0385A, 0 0 22px rgba(240,56,90,.3)" : "inset 0 0 0 1px rgba(130,180,230,.22)",
@@ -513,7 +540,7 @@ export function Vote({ room, actions, secondsLeft }: Props) {
             >
               <Avatar name={p.name} index={i} size={46} />
               <span className="w-full truncate text-center text-[16px] font-bold leading-tight">{p.name}</span>
-              <span className="label">{mine ? "You" : (p.caseRole ?? (p.isBot ? "AI bot" : "Suspect"))}</span>
+              <span className="label line-clamp-2 text-center">{mine ? "You" : (p.caseRole ?? (p.isBot ? "AI bot" : "Suspect"))}</span>
               <span className="mt-1.5 w-full px-1">
                 <Meter value={p.doubt ?? 0} color="#F0385A" />
               </span>
@@ -546,7 +573,6 @@ export function Verdict({ room, actions }: Props) {
   const [busy, setBusy] = useState(false);
   const [xp, setXp] = useState({ gained: 0, total: 0 });
   const audio = useRef<HTMLAudioElement | null>(null);
-  const loaded = useRef(false);
   const text = `${r.story} ${r.roast}`;
   const culpritIdx = indexOf(room, r.culpritId);
   const tally = room.players
@@ -569,9 +595,8 @@ export function Verdict({ room, actions }: Props) {
   // Fetch the narration once and try to play it. Phones may block autoplay,
   // so the play button always stays.
   useEffect(() => {
-    if (loaded.current) return;
-    loaded.current = true;
     let cancelled = false;
+    setVoice("loading");
     (async () => {
       try {
         const res = await fetch("/api/tts", {
